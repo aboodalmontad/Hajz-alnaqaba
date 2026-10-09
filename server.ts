@@ -1154,23 +1154,43 @@ app.post('/api/admin/counters', requireAdmin, (req, res) => {
       return res.status(404).json({ error: 'الشباك غير موجود.' });
     }
 
-    if (name) counter.name = name;
+    const oldName = counter.name;
+    if (name && typeof name === 'string' && name.trim()) {
+      counter.name = name.trim();
+      // Update any tickets assigned to this counter with the new counter name
+      db.tickets.forEach(t => {
+        if (t.counterId === counter.id) {
+          t.counterName = counter.name;
+        }
+      });
+      // Update counter sessions with new counter name
+      db.counterSessions.forEach(cs => {
+        if (cs.counterId === counter.id) {
+          cs.counterName = counter.name;
+        }
+      });
+    }
     if (typeof isOpen === 'boolean') counter.isOpen = isOpen;
     if (typeof isPaused === 'boolean') counter.isPaused = isPaused;
 
     saveDb(db);
     broadcastState();
 
-    logAudit('تعديل شباك', `تم تعديل بيانات ${counter.name} (مفتوح: ${counter.isOpen})`, 'المدير العام', 'counter');
-    return res.json({ success: true, counter, counters: db.counters });
+    logAudit('تعديل اسم الشباك وحفظه', `تم تعديل اسم الشباك من (${oldName}) إلى (${counter.name}) وحفظ التغييرات بنجاح`, 'المدير العام', 'counter');
+    return res.json({ 
+      success: true, 
+      message: `تم الحفظ بنجاح: تم تعديل اسم الشباك إلى (${counter.name})`, 
+      counter, 
+      counters: db.counters 
+    });
   } else {
-    if (!name) {
+    if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'اسم الشباك مطلوب.' });
     }
 
     const newCounter: Counter = {
       id: `counter-${Date.now()}`,
-      name,
+      name: name.trim(),
       isOpen: true,
       isPaused: false
     };
@@ -1179,8 +1199,13 @@ app.post('/api/admin/counters', requireAdmin, (req, res) => {
     saveDb(db);
     broadcastState();
 
-    logAudit('إضافة شباك جديد', `تمت إضافة شباك جديد: ${newCounter.name}`, 'المدير العام', 'counter');
-    return res.json({ success: true, counter: newCounter, counters: db.counters });
+    logAudit('إضافة شباك جديد', `تمت إضافة وحفظ شباك جديد: ${newCounter.name}`, 'المدير العام', 'counter');
+    return res.json({ 
+      success: true, 
+      message: `تم الحفظ بنجاح: تمت إضافة الشباك (${newCounter.name})`, 
+      counter: newCounter, 
+      counters: db.counters 
+    });
   }
 });
 
