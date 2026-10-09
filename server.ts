@@ -21,12 +21,21 @@ const app = express();
 app.use(express.json());
 
 const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
+let io: any;
+try {
+  if (!process.env.VERCEL) {
+    io = new Server(server, {
+      cors: {
+        origin: '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE']
+      }
+    });
+  } else {
+    io = { emit: () => {}, on: () => {} };
   }
-});
+} catch (e) {
+  io = { emit: () => {}, on: () => {} };
+}
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 let DATA_DIR = join(__dirname, 'data');
@@ -1397,7 +1406,7 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
 });
 
 // Socket.io connection handling
-io.on('connection', (socket) => {
+io.on('connection', (socket: any) => {
   socket.emit('state_update', {
     tickets: db.tickets,
     staff: db.staff.map(s => ({ ...s, pin: '****' })),

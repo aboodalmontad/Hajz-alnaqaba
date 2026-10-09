@@ -132,37 +132,51 @@ export default function App() {
   useEffect(() => {
     fetchState();
 
+    // Periodic polling fallback for Vercel/serverless environments where WebSocket is unavailable
+    const pollTimer = setInterval(() => {
+      fetchState();
+    }, 5000);
+
     // Socket.io real-time connection
-    const socket: Socket = io();
+    let socket: Socket | null = null;
+    try {
+      socket = io();
 
-    socket.on('connect', () => {
+      socket.on('connect', () => {
+        setConnected(true);
+      });
+
+      socket.on('disconnect', () => {
+        setConnected(false);
+      });
+
+      socket.on('state_update', (state) => {
+        if (state.tickets) setTickets(state.tickets);
+        if (state.staff) setStaffList(state.staff);
+        if (state.counters) setCounters(state.counters);
+        if (state.counterSessions) setCounterSessions(state.counterSessions);
+        if (typeof state.issuancePaused === 'boolean') setIssuancePaused(state.issuancePaused);
+        if (state.date) setDate(state.date);
+        if (state.settings) setSettings(state.settings);
+      });
+
+      socket.on('ticket_called', (callData) => {
+        setLastCalledTicket(callData);
+      });
+
+      socket.on('audit_log_added', (newLog: AuditLog) => {
+        setAuditLogs(prev => [newLog, ...prev.slice(0, 1999)]);
+      });
+    } catch (e) {
+      console.log('Socket.io connection not established, using polling fallback');
       setConnected(true);
-    });
-
-    socket.on('disconnect', () => {
-      setConnected(false);
-    });
-
-    socket.on('state_update', (state) => {
-      if (state.tickets) setTickets(state.tickets);
-      if (state.staff) setStaffList(state.staff);
-      if (state.counters) setCounters(state.counters);
-      if (state.counterSessions) setCounterSessions(state.counterSessions);
-      if (typeof state.issuancePaused === 'boolean') setIssuancePaused(state.issuancePaused);
-      if (state.date) setDate(state.date);
-      if (state.settings) setSettings(state.settings);
-    });
-
-    socket.on('ticket_called', (callData) => {
-      setLastCalledTicket(callData);
-    });
-
-    socket.on('audit_log_added', (newLog: AuditLog) => {
-      setAuditLogs(prev => [newLog, ...prev.slice(0, 1999)]);
-    });
+    }
 
     return () => {
-      socket.disconnect();
+      clearInterval(pollTimer);
+      if (socket) {
+        socket.disconnect();
+      }
     };
   }, [fetchState]);
 
