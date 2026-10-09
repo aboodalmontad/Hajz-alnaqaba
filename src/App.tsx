@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Ticket, Staff, Counter, AuditLog, SystemSettings, CounterSession } from './types';
+import { apiFetch } from './utils/network';
 import { Navbar } from './components/Navbar';
 import { NetworkGuide } from './components/NetworkGuide';
 import { Kiosk } from './components/Kiosk';
@@ -98,8 +99,7 @@ export default function App() {
   }, []);
 
   const fetchState = useCallback(() => {
-    fetch('/api/state')
-      .then(res => res.json())
+    apiFetch('/api/state')
       .then(data => {
         if (data.tickets) setTickets(data.tickets);
         if (data.staff) setStaffList(data.staff);
@@ -116,13 +116,12 @@ export default function App() {
 
     const token = sessionStorage.getItem('agency_admin_token');
     if (token) {
-      fetch('/api/admin/logs', {
+      apiFetch('/api/admin/logs', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'x-admin-token': token
         }
       })
-        .then(res => res.ok ? res.json() : [])
         .then(logs => {
           if (Array.isArray(logs)) setAuditLogs(logs);
         })
@@ -170,65 +169,56 @@ export default function App() {
   // Client Ticket Actions
   const handleIssueTicket = async (category: string): Promise<Ticket | null> => {
     try {
-      const res = await fetch('/api/tickets', {
+      const data = await apiFetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'خطأ في إصدار التذكرة');
       return data;
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'خطأ في إصدار التذكرة');
       return null;
     }
   };
 
   const handleCallNext = async (staffId: string, counterId: string) => {
-    const res = await fetch('/api/staff/call-next', {
+    return await apiFetch('/api/staff/call-next', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ staffId, counterId })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'خطأ في الاستدعاء');
-    return data;
   };
 
   const handleRecall = async (ticketId: string, staffId: string) => {
-    const res = await fetch('/api/staff/recall', {
+    return await apiFetch('/api/staff/recall', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId, staffId })
     });
-    return await res.json();
   };
 
   const handleComplete = async (ticketId: string, staffId: string) => {
-    const res = await fetch('/api/staff/complete', {
+    return await apiFetch('/api/staff/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId, staffId })
     });
-    return await res.json();
   };
 
   const handleSkip = async (ticketId: string, notes: string) => {
-    const res = await fetch('/api/staff/skip', {
+    return await apiFetch('/api/staff/skip', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId, notes })
     });
-    return await res.json();
   };
 
   const handleReturnQueue = async (ticketId: string) => {
-    const res = await fetch('/api/staff/return-queue', {
+    return await apiFetch('/api/staff/return-queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId })
     });
-    return await res.json();
   };
 
   const waitingCount = tickets.filter(t => t.status === 'waiting').length;

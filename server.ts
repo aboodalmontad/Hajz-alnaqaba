@@ -1474,4 +1474,14 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+} else {
+  // Ensure static/middleware is set up for serverless invocation
+  const DIST_DIR = join(__dirname, 'dist');
+  if (fs.existsSync(DIST_DIR)) {
+    app.use(express.static(DIST_DIR));
+  }
+}
+
+export default app;
