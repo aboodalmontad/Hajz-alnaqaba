@@ -18,7 +18,8 @@ import {
   ArrowRight,
   UserCheck,
   CheckCircle2,
-  Info
+  Info,
+  Monitor
 } from 'lucide-react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
 
