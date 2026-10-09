@@ -87,8 +87,13 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
       <div className="bg-gradient-to-l from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-500/30 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold border border-amber-500/30">
-            <Wifi className="w-3.5 h-3.5" /> شبكة Wi-Fi المحلية (تعمل بدون اتصال إنترنت)
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold border border-amber-500/30">
+              <Wifi className="w-3.5 h-3.5" /> شبكة Wi-Fi المحلية (تعمل بدون اتصال إنترنت)
+            </div>
+            <div className="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-amber-400/40">
+              الإصدار 1
+            </div>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
             نظام إدارة دور دائرة الوكالات <br />
