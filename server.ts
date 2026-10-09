@@ -11,7 +11,6 @@ import { dirname, join } from 'path';
 import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
-import { createServer as createViteServer } from 'vite';
 import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1495,7 +1494,8 @@ async function startServer() {
   
   if (!isProduction) {
     try {
-      const vite = await createViteServer({
+      const viteModule = await import('vite');
+      const vite = await viteModule.createServer({
         server: { middlewareMode: true },
         appType: 'spa'
       });
