@@ -1397,20 +1397,28 @@ io.on('connection', (socket) => {
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
-    const DIST_DIR = join(__dirname, 'dist');
-    if (fs.existsSync(DIST_DIR)) {
-      app.use(express.static(DIST_DIR));
-      app.get('*', (req, res) => {
-        res.sendFile(join(DIST_DIR, 'index.html'));
+  const DIST_DIR = join(__dirname, 'dist');
+  if (process.env.NODE_ENV !== 'production' || !fs.existsSync(DIST_DIR)) {
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa'
       });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.error('Failed to create Vite server:', e);
+      if (fs.existsSync(DIST_DIR)) {
+        app.use(express.static(DIST_DIR));
+        app.get('*', (req, res) => {
+          res.sendFile(join(DIST_DIR, 'index.html'));
+        });
+      }
     }
+  } else {
+    app.use(express.static(DIST_DIR));
+    app.get('*', (req, res) => {
+      res.sendFile(join(DIST_DIR, 'index.html'));
+    });
   }
 
   server.listen(PORT, '0.0.0.0', () => {
