@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Wifi, 
@@ -19,7 +19,8 @@ import {
   UserCheck,
   CheckCircle2,
   Info,
-  Monitor
+  Monitor,
+  RefreshCw
 } from 'lucide-react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
 
@@ -28,18 +29,52 @@ interface NetworkGuideProps {
   port: number;
   serverAppUrl?: string;
   onNavigate: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
+  connected?: boolean;
+  onActivateServer?: () => Promise<boolean> | void;
 }
 
 export const NetworkGuide: React.FC<NetworkGuideProps> = ({
   localIPs,
   port,
   serverAppUrl,
-  onNavigate
+  onNavigate,
+  connected = false,
+  onActivateServer
 }) => {
   const [overrideIP, setOverrideIP] = useState<string>('');
   const [copiedAgent, setCopiedAgent] = useState(false);
   const [copiedBase, setCopiedBase] = useState(false);
   const [activeQrTarget, setActiveQrTarget] = useState<'agent' | 'display' | 'kiosk'>('agent');
+  const [activating, setActivating] = useState(false);
+  const [activateMsg, setActivateMsg] = useState<string | null>(null);
+
+  // Auto-connect and activate server as soon as the Home page is entered
+  useEffect(() => {
+    if (onActivateServer) {
+      setActivating(true);
+      Promise.resolve(onActivateServer())
+        .catch(() => {})
+        .finally(() => {
+          setActivating(false);
+        });
+    }
+  }, [onActivateServer]);
+
+  const handleManualActivate = async () => {
+    setActivating(true);
+    setActivateMsg(null);
+    try {
+      if (onActivateServer) {
+        await onActivateServer();
+      }
+      setActivateMsg('✓ تم الاتصال بالسيرفر وتحديث البيانات بنجاح!');
+    } catch {
+      setActivateMsg('تعذر الاتصال بالسيرفر، تأكد من تشغيل start.bat');
+    } finally {
+      setActivating(false);
+      setTimeout(() => setActivateMsg(null), 3500);
+    }
+  };
 
   // Compute clean reachable URLs
   const baseUrl = resolveBaseUrl(localIPs, port, serverAppUrl, overrideIP);
@@ -93,7 +128,7 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               <Wifi className="w-3.5 h-3.5" /> شبكة Wi-Fi المحلية (تعمل بدون اتصال إنترنت)
             </div>
             <div className="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-amber-400/40">
-              الإصدار 1
+              الإصدار 5
             </div>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
@@ -103,6 +138,43 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
           <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
             نظام لحظي مترابط يربط هواتف مندوبي الوكالات وشاشة صالة الانتظار وجهاز إصدار التذاكر عبر الخادم المحلي. يستطيع أي مندوب مسح رمز الـ QR أدناه بهاتفه لفتح واجهة العمل واختيار الشباك فوراً.
           </p>
+
+          {/* Real-time Server Connection Status & Activation Bar */}
+          <div className="bg-slate-950/80 border border-slate-700/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${connected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-pulse' : activating ? 'bg-amber-400 animate-spin' : 'bg-rose-500'}`} />
+              <div className="text-right">
+                <div className="text-xs font-bold flex items-center gap-1.5">
+                  {connected ? (
+                    <span className="text-emerald-300 font-extrabold">السيرفر المحلي متصل ونشط ومفعّل الآن</span>
+                  ) : activating ? (
+                    <span className="text-amber-300">جارِ الاتصال بالسيرفر وتفعيله...</span>
+                  ) : (
+                    <span className="text-rose-400">غير متصل بالسيرفر المحلي</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  {baseUrl}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleManualActivate}
+              disabled={activating}
+              className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${activating ? 'animate-spin' : ''}`} />
+              {activating ? 'جارِ التنشيط...' : 'تنشيط وفحص الاتصال بالسيرفر'}
+            </button>
+          </div>
+
+          {activateMsg && (
+            <div className={`text-xs font-bold p-2.5 rounded-xl text-center border animate-fade-in ${activateMsg.startsWith('✓') ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
+              {activateMsg}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2.5 pt-2">
             <button
               onClick={() => onNavigate('staff')}

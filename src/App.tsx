@@ -99,8 +99,9 @@ export default function App() {
   }, []);
 
   const fetchState = useCallback(() => {
-    apiFetch('/api/state')
+    return apiFetch('/api/state')
       .then(data => {
+        setConnected(true);
         if (data.tickets) setTickets(data.tickets);
         if (data.staff) setStaffList(data.staff);
         if (data.counters) setCounters(data.counters);
@@ -111,23 +112,34 @@ export default function App() {
         if (data.port) setPort(data.port);
         if (data.appUrl) setServerAppUrl(data.appUrl);
         if (data.settings) setSettings(data.settings);
+        return true;
       })
-      .catch(err => console.error('Failed to fetch initial state:', err));
-
-    const token = sessionStorage.getItem('agency_admin_token');
-    if (token) {
-      apiFetch('/api/admin/logs', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'x-admin-token': token
+      .catch(err => {
+        console.error('Failed to fetch initial state:', err);
+        setConnected(false);
+        return false;
+      })
+      .finally(() => {
+        const token = sessionStorage.getItem('agency_admin_token');
+        if (token) {
+          apiFetch('/api/admin/logs', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'x-admin-token': token
+            }
+          })
+            .then(logs => {
+              if (Array.isArray(logs)) setAuditLogs(logs);
+            })
+            .catch(() => {});
         }
-      })
-        .then(logs => {
-          if (Array.isArray(logs)) setAuditLogs(logs);
-        })
-        .catch(() => {});
-    }
+      });
   }, []);
+
+  // Immediately connect and activate server whenever user navigates tabs, especially to the Home page
+  useEffect(() => {
+    fetchState();
+  }, [currentTab, fetchState]);
 
   useEffect(() => {
     fetchState();
@@ -258,6 +270,8 @@ export default function App() {
             port={port}
             serverAppUrl={serverAppUrl}
             onNavigate={handleNavigate}
+            connected={connected}
+            onActivateServer={fetchState}
           />
         )}
 

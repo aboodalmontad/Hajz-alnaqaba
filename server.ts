@@ -353,6 +353,15 @@ app.use('/api', (req, res, next) => {
 // PUBLIC & CLIENT API ROUTES
 // ==========================================
 
+app.get('/api/ping', (req, res) => {
+  res.json({
+    status: 'ok',
+    connected: true,
+    message: 'Local server is active and ready',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api/state', (req, res) => {
   res.json({
     tickets: db.tickets,
