@@ -91,13 +91,18 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
   if (contentType.includes('application/json')) {
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || data.message || `خطأ في الخادم (${res.status})`);
+      const err: any = new Error(data.error || data.message || `خطأ في الخادم (${res.status})`);
+      err.status = res.status;
+      err.data = data;
+      throw err;
     }
     return data;
   } else {
     const text = await res.text();
     if (!res.ok) {
-      throw new Error(`تعذر الاتصال بالخادم (${res.status}): ${text.substring(0, 80)}`);
+      const err: any = new Error(`تعذر الاتصال بالخادم (${res.status}): ${text.substring(0, 80)}`);
+      err.status = res.status;
+      throw err;
     }
     try {
       return JSON.parse(text);

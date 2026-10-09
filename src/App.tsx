@@ -130,7 +130,7 @@ export default function App() {
         return false;
       })
       .finally(() => {
-        const token = sessionStorage.getItem('agency_admin_token');
+        const token = sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
         if (token) {
           apiFetch('/api/admin/logs', {
             headers: {
@@ -295,6 +295,8 @@ export default function App() {
             waitingCount={waitingCount}
             categories={settings.categories}
             departmentTitle={settings.departmentTitle}
+            counters={counters}
+            onRefreshState={fetchState}
           />
         )}
 

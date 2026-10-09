@@ -80,7 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   // Auth state
   const [adminToken, setAdminToken] = useState<string | null>(() => {
-    return sessionStorage.getItem('agency_admin_token') || null;
+    return sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token') || null;
   });
   const [adminPinInput, setAdminPinInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -226,21 +226,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Admin Request Helper
   const adminFetch = async (url: string, options: RequestInit = {}) => {
-    if (!adminToken) throw new Error('يرجى تسجيل الدخول كمسؤول.');
-    const headers = {
+    const currentToken = adminToken || sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
+    if (!currentToken) {
+      setAdminToken(null);
+      throw new Error('يرجى تسجيل الدخول أولاً بصفتك المدير العام.');
+    }
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${adminToken}`,
-      'x-admin-token': adminToken,
-      ...(options.headers || {})
+      'Authorization': `Bearer ${currentToken}`,
+      'x-admin-token': currentToken,
+      ...(options.headers as Record<string, string> || {})
     };
 
     try {
       return await apiFetch(url, { ...options, headers });
     } catch (err: any) {
-      if (err.message && err.message.includes('401')) {
+      if (err.status === 401 || (err.message && (err.message.includes('401') || err.message.includes('انتهت صلاحية الجلسة') || err.message.includes('غير مصرح')))) {
         setAdminToken(null);
         sessionStorage.removeItem('agency_admin_token');
-        throw new Error('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.');
+        localStorage.removeItem('agency_admin_token');
+        throw new Error('انتهت صلاحية الجلسة، يرجى إعادة إدخال رمز المدير العام.');
       }
       throw err;
     }
@@ -261,10 +266,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       setAdminToken(data.token);
       sessionStorage.setItem('agency_admin_token', data.token);
+      localStorage.setItem('agency_admin_token', data.token);
       setAdminPinInput('');
       fetchAdminStaffList(data.token);
       onRefreshState();
-      showToast('success', 'مرحباً بك، تم التحقق من صلاحيات المدير العام.');
+      showToast('success', 'مرحباً بك، تم التحقق من صلاحيات المدير العام بنجاح.');
     } catch (err: any) {
       setAuthError(err.message || 'رمز الدخول غير صحيح.');
     } finally {
@@ -275,6 +281,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleAdminLogout = () => {
     setAdminToken(null);
     sessionStorage.removeItem('agency_admin_token');
+    localStorage.removeItem('agency_admin_token');
   };
 
   // Change Admin PIN
@@ -476,28 +483,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ----------------------------------------------------
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    const savedName = categoryFormName.trim();
     try {
       if (editingCategory) {
         const data = await adminFetch(`/api/admin/categories/${editingCategory.id}`, {
           method: 'PUT',
           body: JSON.stringify({
-            name: categoryFormName,
+            name: savedName,
             prefix: categoryFormPrefix,
             desc: categoryFormDesc
           })
         });
-        showToast('success', data.message || 'تم تحديث فئة الخدمة بنجاح.');
+        showToast('success', data.message || `تم حفظ التعديل بنجاح: تم تحديث اسم الخدمة (${savedName}) في جهاز إصدار التذاكر والشبابيك.`);
       } else {
         const data = await adminFetch('/api/admin/categories', {
           method: 'POST',
           body: JSON.stringify({
             id: categoryFormId,
-            name: categoryFormName,
+            name: savedName,
             prefix: categoryFormPrefix,
             desc: categoryFormDesc
           })
         });
-        showToast('success', data.message || 'تمت إضافة فئة الخدمة بنجاح.');
+        showToast('success', data.message || `تم حفظ التعديل بنجاح: تمت إضافة خدمة (${savedName}) لجهاز إصدار التذاكر.`);
       }
       setShowCategoryModal(false);
       setEditingCategory(null);
@@ -1152,7 +1160,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 dataSubTab === 'categories' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              <span>فئات الخدمات والمعاملات ({settings?.categories?.length || 0})</span>
+              <span>خدمات جهاز الإصدار والشبابيك ({settings?.categories?.length || 0})</span>
             </button>
             <button
               onClick={() => setDataSubTab('shifts')}
@@ -1719,8 +1727,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">إدارة وتصنيف فئات الخدمات والمعاملات</h3>
-                  <p className="text-xs text-slate-500">إضافة فئات جديدة، تخصيص بادئة الترقيم (Prefix)، وتعديل أو حذف أي خدمة بالمنصة</p>
+                  <h3 className="text-base font-bold text-slate-900">إدارة وتعديل خدمات جهاز إصدار الدور (لتتطابق مع أسماء الشبابيك)</h3>
+                  <p className="text-xs text-slate-500">تعديل أسماء الخدمات المعروضة للمراجعين في صفحة جهاز إصدار تذاكر الدور (مثل: توثيق وكالة، الحصول على صورة عن وكالة، ...)</p>
                 </div>
                 <button
                   onClick={() => {
@@ -2737,14 +2745,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <form onSubmit={handleSaveCategory} className="space-y-4">
+              {/* Quick Matching from Existing Counters */}
+              {counters && counters.length > 0 && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-amber-600" />
+                    اقتباس ومطابقة اسم الخدمة مع أحد الشبابيك الحالية:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {counters.map(counter => {
+                      const match = counter.name.match(/\((.*?)\)/);
+                      const cleanName = match ? match[1] : counter.name.replace(/^الشباك\s*\d+\s*/, '');
+                      return (
+                        <button
+                          key={counter.id}
+                          type="button"
+                          onClick={() => {
+                            setCategoryFormName(cleanName);
+                            if (!categoryFormDesc) {
+                              setCategoryFormDesc(`تنجز هذه المعاملة لدى ${counter.name}`);
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-slate-800 hover:text-amber-900 rounded-lg text-xs font-medium border border-slate-200 transition-colors shadow-xs"
+                        >
+                          {counter.name} &larr; <strong className="text-amber-700">{cleanName}</strong>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Suggested Names */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">اسم فئة المعاملة:</label>
+                <label className="text-xs font-bold text-slate-700">نماذج خدمات شائعة بنقرة واحدة:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { name: 'توثيق وكالة', desc: 'تنظيم وتوثيق الوكالات العامة والخاصة وتثبيتها أصولاً' },
+                    { name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة' },
+                    { name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع والفراغ وإدارة الأملاك والمركبات' },
+                    { name: 'تصديق العقود والاتفاقيات', desc: 'تصديق وتثبيت العقود والاتفاقيات القانونية' },
+                    { name: 'الاستعلامات والدعم النقابي', desc: 'الاستعلام عن الأوراق المطلوبة والرسوم النقابية' }
+                  ].map(preset => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => {
+                        setCategoryFormName(preset.name);
+                        setCategoryFormDesc(preset.desc);
+                      }}
+                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-xs font-bold border border-amber-200 transition-colors"
+                    >
+                      + {preset.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">اسم الخدمة في جهاز الإصدار (Kiosk): <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={categoryFormName}
                   onChange={e => setCategoryFormName(e.target.value)}
-                  placeholder="مثال: وكالات تجارية وشركات"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  placeholder="مثال: توثيق وكالة أو الحصول على صورة عن وكالة"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none focus:bg-white"
                   required
                 />
               </div>
