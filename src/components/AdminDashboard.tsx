@@ -145,6 +145,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [counterFormName, setCounterFormName] = useState('');
   const [counterFormOpen, setCounterFormOpen] = useState(true);
   const [showAddCounterModal, setShowAddCounterModal] = useState(false);
+  const [recentlyEditedCounterId, setRecentlyEditedCounterId] = useState<string | null>(null);
 
   // Move Staff Counter Modal
   const [moveStaffModal, setMoveStaffModal] = useState<{
@@ -677,17 +678,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     try {
       if (editingCounter) {
+        const editedId = editingCounter.id;
         const data = await adminFetch('/api/admin/counters', {
           method: 'POST',
           body: JSON.stringify({
-            id: editingCounter.id,
+            id: editedId,
             name: trimmedName,
             isOpen: counterFormOpen
           })
         });
         setEditingCounter(null);
         setShowAddCounterModal(false);
-        showToast('success', data.message || `تم الحفظ بنجاح: تم تعديل اسم الشباك إلى (${trimmedName})`);
+        setRecentlyEditedCounterId(editedId);
+        setTimeout(() => setRecentlyEditedCounterId(null), 5000);
+        showToast('success', `تم حفظ التعديل: تم تغيير اسم الشباك إلى "${trimmedName}" بنجاح.`);
       } else {
         const data = await adminFetch('/api/admin/counters', {
           method: 'POST',
@@ -697,7 +701,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           })
         });
         setShowAddCounterModal(false);
-        showToast('success', data.message || `تم الحفظ بنجاح: تمت إضافة الشباك (${trimmedName})`);
+        showToast('success', `تم حفظ الشباك الجديد: تمت إضافة "${trimmedName}" بنجاح.`);
       }
       setCounterFormName('');
       onRefreshState();
@@ -943,13 +947,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               : 'bg-red-600 text-white border-red-400 shadow-red-950/40 ring-4 ring-red-500/20'
           }`}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                {toastMessage.type === 'success' ? <CheckCircle className="w-5 h-5 text-white" /> : <AlertTriangle className="w-5 h-5 text-white" />}
+              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                {toastMessage.type === 'success' ? <CheckCircle className="w-6 h-6 text-white" /> : <AlertTriangle className="w-6 h-6 text-white" />}
               </div>
-              <span className="leading-snug text-sm">{toastMessage.text}</span>
+              <div className="flex flex-col text-right">
+                <span className="font-black text-base text-white">
+                  {toastMessage.type === 'success' ? 'تم حفظ التعديل' : 'تنبيه'}
+                </span>
+                <span className="text-xs text-emerald-100 font-medium">{toastMessage.text}</span>
+              </div>
             </div>
             <button onClick={() => setToastMessage(null)} className="p-1.5 hover:bg-white/20 rounded-lg shrink-0 transition-colors">
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5 text-white" />
             </button>
           </div>
         </div>
@@ -1214,11 +1223,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       }`}
                     >
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <h4 className="font-bold text-slate-900 text-sm">{counter.name}</h4>
-                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusBadge.color}`}>
-                            {statusBadge.text}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {recentlyEditedCounterId === counter.id && (
+                              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-emerald-100 text-emerald-800 border-emerald-300 animate-pulse flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                تم حفظ التعديل
+                              </span>
+                            )}
+                            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusBadge.color}`}>
+                              {statusBadge.text}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1.5 shadow-xs">
