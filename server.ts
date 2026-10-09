@@ -1398,8 +1398,9 @@ io.on('connection', (socket) => {
 
 async function startServer() {
   const DIST_DIR = join(__dirname, 'dist');
+  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(DIST_DIR);
   
-  if (process.env.NODE_ENV !== 'production' || !fs.existsSync(DIST_DIR)) {
+  if (!isProduction) {
     try {
       const vite = await createViteServer({
         server: { middlewareMode: true },
