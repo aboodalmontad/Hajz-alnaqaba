@@ -145,6 +145,7 @@ interface DatabaseSchema {
   counters: Counter[];
   counterSessions: CounterSession[];
   auditLogs: AuditLog[];
+  activeTokens?: string[];
 }
 
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
@@ -308,21 +309,36 @@ function logAudit(action: string, details: string, user: string = 'المدير 
 
 // Middleware: Verify Admin Authorization
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const tokenHeader = req.headers['x-admin-token'] as string;
-  let token = tokenHeader;
+  try {
+    const authHeader = req.headers['authorization'];
+    const tokenHeader = req.headers['x-admin-token'] as string;
+    let token = tokenHeader;
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  }
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
 
-  if (!token || !activeAdminTokens.has(token)) {
+    if (!token) {
+      return res.status(401).json({ error: 'غير مصرح: لم يتم تقديم رمز التوثيق.' });
+    }
+
+    if (activeAdminTokens.has(token)) {
+      return next();
+    }
+
+    // Fallback check against persisted db.activeTokens for serverless scaling
+    if (db && Array.isArray((db as any).activeTokens) && (db as any).activeTokens.includes(token)) {
+      activeAdminTokens.add(token);
+      return next();
+    }
+
     return res.status(401).json({
-      error: 'غير مصرح: يتطلب هذا الإجراء صلاحيات المدير العام المعتمدة.'
+      error: 'انتهت صلاحية الجلسة أو لم يتم تسجيل الدخول بصفتك المدير العام.'
     });
+  } catch (err) {
+    console.error('requireAdmin error:', err);
+    return res.status(401).json({ error: 'خطأ في المصادقة.' });
   }
-
-  next();
 }
 
 // Normalize trailing slashes for all /api requests to prevent 404s
@@ -821,8 +837,8 @@ app.post('/api/staff/return-queue', (req, res) => {
 
 app.post('/api/admin/login', (req, res) => {
   try {
-    const { pin } = req.body;
-    const correctPin = db.settings.adminPin || '9999';
+    const pin = req.body?.pin;
+    const correctPin = db?.settings?.adminPin || '9999';
 
     if (!pin || pin !== correctPin) {
       console.error('Admin login failed: incorrect PIN attempt');
@@ -831,17 +847,28 @@ app.post('/api/admin/login', (req, res) => {
 
     const token = `admin-token-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
     activeAdminTokens.add(token);
+    
+    if (!db.activeTokens) (db as any).activeTokens = [];
+    (db as any).activeTokens.push(token);
+    if ((db as any).activeTokens.length > 100) {
+      (db as any).activeTokens = (db as any).activeTokens.slice(-100);
+    }
+    saveDb(db);
 
-    logAudit('تسجيل دخول المدير', 'تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة', 'المدير العام', 'auth');
+    try {
+      logAudit('تسجيل دخول المدير', 'تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة', 'المدير العام', 'auth');
+    } catch (auditErr) {
+      console.error('Audit log error during login:', auditErr);
+    }
 
-    res.json({
+    return res.json({
       success: true,
       token,
       adminName: 'المدير العام لدائرة الوكالات'
     });
-  } catch (err) {
-    console.error('Admin login error (FUNCTION_INVOCATION_FAILED):', err);
-    res.status(500).json({ error: 'تعذر الاتصال بالخادم (500): A server error has occurred' });
+  } catch (err: any) {
+    console.error('Admin login error (FUNCTION_INVOCATION_FAILED):', err?.message || err, err?.stack);
+    return res.status(500).json({ error: 'تعذر الاتصال بالخادم (500): A server error has occurred' });
   }
 });
 
