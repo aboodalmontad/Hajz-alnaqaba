@@ -1398,6 +1398,7 @@ io.on('connection', (socket) => {
 
 async function startServer() {
   const DIST_DIR = join(__dirname, 'dist');
+  
   if (process.env.NODE_ENV !== 'production' || !fs.existsSync(DIST_DIR)) {
     try {
       const vite = await createViteServer({
@@ -1407,19 +1408,28 @@ async function startServer() {
       app.use(vite.middlewares);
     } catch (e) {
       console.error('Failed to create Vite server:', e);
-      if (fs.existsSync(DIST_DIR)) {
-        app.use(express.static(DIST_DIR));
-        app.get('*', (req, res) => {
-          res.sendFile(join(DIST_DIR, 'index.html'));
-        });
-      }
     }
-  } else {
-    app.use(express.static(DIST_DIR));
-    app.get('*', (req, res) => {
-      res.sendFile(join(DIST_DIR, 'index.html'));
-    });
   }
+
+  if (fs.existsSync(DIST_DIR)) {
+    app.use(express.static(DIST_DIR));
+  }
+
+  // Fallback static serving for assets or root index.html
+  app.use(express.static(__dirname));
+
+  // Universal SPA fallback route for any non-API path (e.g. /agent, /display, /kiosk, /admin)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    const distIndex = join(DIST_DIR, 'index.html');
+    if (fs.existsSync(distIndex)) {
+      res.sendFile(distIndex);
+    } else {
+      res.sendFile(join(__dirname, 'index.html'));
+    }
+  });
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`==================================================`);
