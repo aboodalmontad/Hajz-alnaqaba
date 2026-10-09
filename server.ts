@@ -29,12 +29,25 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-const DATA_DIR = join(__dirname, 'data');
-const DB_FILE = join(DATA_DIR, 'queue_db.json');
+let DATA_DIR = join(__dirname, 'data');
+let DB_FILE = join(DATA_DIR, 'queue_db.json');
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// Ensure data directory exists, with fallback to os.tmpdir() if read-only (e.g. Vercel serverless)
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  fs.accessSync(DATA_DIR, fs.constants.W_OK);
+} catch (err) {
+  DATA_DIR = join(os.tmpdir(), 'queue_data');
+  DB_FILE = join(DATA_DIR, 'queue_db.json');
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (e) {
+      // Ignore
+    }
+  }
 }
 
 interface Ticket {
