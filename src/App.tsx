@@ -248,6 +248,7 @@ export default function App() {
         serverAppUrl={serverAppUrl}
         waitingCount={waitingCount}
         departmentTitle={settings.departmentTitle}
+        onReconnect={fetchState}
       />
 
       <main className="flex-1">

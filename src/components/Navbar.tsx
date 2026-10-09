@@ -30,6 +30,7 @@ interface NavbarProps {
   serverAppUrl?: string;
   waitingCount: number;
   departmentTitle?: string;
+  onReconnect?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,11 +41,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   port,
   serverAppUrl,
   waitingCount,
-  departmentTitle
+  departmentTitle,
+  onReconnect
 }) => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showServerStatusModal, setShowServerStatusModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectMsg, setReconnectMsg] = useState(false);
 
   const baseUrl = resolveBaseUrl(localIPs, port, serverAppUrl);
   const agentUrl = resolveAgentUrl(baseUrl);
@@ -61,6 +65,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     await copyToClipboard(baseUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleTriggerReconnect = () => {
+    setReconnecting(true);
+    if (onReconnect) {
+      onReconnect();
+    }
+    setTimeout(() => {
+      setReconnecting(false);
+      setReconnectMsg(true);
+      setTimeout(() => setReconnectMsg(false), 3000);
+    }, 1000);
   };
 
   return (
@@ -342,12 +358,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {copied ? 'تم نسخ الرابط!' : 'نسخ عنوان السيرفر'}
               </button>
               <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all border border-slate-700"
+                onClick={handleTriggerReconnect}
+                disabled={reconnecting}
+                className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all border border-slate-700 disabled:opacity-50 flex items-center gap-1.5"
               >
-                إعادة اتصال
+                {reconnecting ? 'جارِ فحص الاتصال...' : 'إعادة اتصال'}
               </button>
             </div>
+
+            {reconnectMsg && (
+              <div className="text-center text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl animate-pulse">
+                ✓ تم إرسال طلب الاتصال وتحديث البيانات بنجاح!
+              </div>
+            )}
 
             <div className="text-[11px] text-slate-400 text-right bg-slate-800/50 border border-slate-700 p-3 rounded-xl leading-relaxed">
               💡 <strong>معلومة:</strong> إذا كان مؤشر الاتصال أخضر، فهذا يعني أن هواتف الموظفين وشاشات العرض متصلة بالخادم المركزي وتتلقى التحديثات فوراً.
