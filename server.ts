@@ -196,8 +196,19 @@ const defaultDb: DatabaseSchema = {
   ]
 };
 
+function ensureDataDir() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.error('Error creating data directory:', err);
+  }
+}
+
 function loadDb(): DatabaseSchema {
   try {
+    ensureDataDir();
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       const loaded = JSON.parse(data) as DatabaseSchema;
@@ -226,6 +237,7 @@ function loadDb(): DatabaseSchema {
 
 function saveDb(currentDb: DatabaseSchema) {
   try {
+    ensureDataDir();
     fs.writeFileSync(DB_FILE, JSON.stringify(currentDb, null, 2), 'utf8');
   } catch (err) {
     console.error('Error saving DB:', err);
@@ -808,23 +820,29 @@ app.post('/api/staff/return-queue', (req, res) => {
 // ==========================================
 
 app.post('/api/admin/login', (req, res) => {
-  const { pin } = req.body;
-  const correctPin = db.settings.adminPin || '9999';
+  try {
+    const { pin } = req.body;
+    const correctPin = db.settings.adminPin || '9999';
 
-  if (!pin || pin !== correctPin) {
-    return res.status(401).json({ error: 'رمز المدير العام غير صحيح.' });
+    if (!pin || pin !== correctPin) {
+      console.error('Admin login failed: incorrect PIN attempt');
+      return res.status(401).json({ error: 'رمز المدير العام غير صحيح.' });
+    }
+
+    const token = `admin-token-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
+    activeAdminTokens.add(token);
+
+    logAudit('تسجيل دخول المدير', 'تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة', 'المدير العام', 'auth');
+
+    res.json({
+      success: true,
+      token,
+      adminName: 'المدير العام لدائرة الوكالات'
+    });
+  } catch (err) {
+    console.error('Admin login error (FUNCTION_INVOCATION_FAILED):', err);
+    res.status(500).json({ error: 'تعذر الاتصال بالخادم (500): A server error has occurred' });
   }
-
-  const token = `admin-token-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
-  activeAdminTokens.add(token);
-
-  logAudit('تسجيل دخول المدير', 'تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة', 'المدير العام', 'auth');
-
-  res.json({
-    success: true,
-    token,
-    adminName: 'المدير العام لدائرة الوكالات'
-  });
 });
 
 app.post('/api/admin/change-pin', requireAdmin, (req, res) => {
