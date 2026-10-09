@@ -80,3 +80,30 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Safely executes a fetch request and parses JSON response, guarding against HTML error pages.
+ */
+export async function apiFetch(url: string, options: RequestInit = {}) {
+  const res = await fetch(url, options);
+  const contentType = res.headers.get('content-type') || '';
+  
+  if (contentType.includes('application/json')) {
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `خطأ في الخادم (${res.status})`);
+    }
+    return data;
+  } else {
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`تعذر الاتصال بالخادم (${res.status}): ${text.substring(0, 80)}`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('استجابة غير صالحة من الخادم (ليست بصيغة JSON)');
+    }
+  }
+}
+

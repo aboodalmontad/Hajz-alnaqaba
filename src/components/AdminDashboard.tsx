@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Staff, Counter, Ticket, AuditLog, SystemSettings, CounterSession } from '../types';
-import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
+import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
 
 interface AdminDashboardProps {
   staffList: Staff[];
@@ -163,17 +163,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       ...(options.headers || {})
     };
 
-    const res = await fetch(url, { ...options, headers });
-    const data = await res.json();
-    if (!res.ok) {
-      if (res.status === 401) {
+    try {
+      return await apiFetch(url, { ...options, headers });
+    } catch (err: any) {
+      if (err.message && err.message.includes('401')) {
         setAdminToken(null);
         sessionStorage.removeItem('agency_admin_token');
         throw new Error('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.');
       }
-      throw new Error(data.error || 'فشلت العملية.');
+      throw err;
     }
-    return data;
   };
 
   // Login handler
@@ -183,15 +182,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setAuthLoading(true);
 
     try {
-      const res = await fetch('/api/admin/login', {
+      const data = await apiFetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: adminPinInput })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'رمز الدخول غير صحيح.');
-      }
 
       setAdminToken(data.token);
       sessionStorage.setItem('agency_admin_token', data.token);
@@ -199,7 +194,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       onRefreshState();
       showToast('success', 'مرحباً بك، تم التحقق من صلاحيات المدير العام.');
     } catch (err: any) {
-      setAuthError(err.message);
+      setAuthError(err.message || 'رمز الدخول غير صحيح.');
     } finally {
       setAuthLoading(false);
     }
