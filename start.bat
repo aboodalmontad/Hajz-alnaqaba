@@ -1,28 +1,41 @@
 @echo off
-chcp 65001 > nul
-title نظام إدارة الدور - نقابة المحامين بحلب (دائرة الوكالات)
+title Queue Management System - Aleppo Bar Association
+color 0B
+cls
+
 echo ======================================================
-echo    تشغيل نظام إدارة الدور المحلي - نقابة المحامين بحلب
+echo   Aleppo Bar Association - Queue Management System
 echo ======================================================
 echo.
 
 REM Check if Node.js is installed
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [خطأ] لم يتم العثور على Node.js في جهازك. يرجى تثبيت Node.js أولاً من الموقع الرسمي:
-    echo https://nodejs.org/
-    echo ثم حاول تشغيل هذا الملف مرة أخرى.
+    echo [ERROR] Node.js is not installed or not found in PATH!
+    echo Please install Node.js from: https://nodejs.org/
+    echo After installation, please restart your computer and run this file again.
+    echo.
     pause
     exit /b 1
 )
 
-echo [1/3] التحقق من تثبيت الحزم والمكتبات اللازمة...
+REM Check if npm is available
+where npm >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] npm is not found! Please reinstall Node.js.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo [1/3] Checking dependencies (node_modules)...
 if not exist "node_modules" (
+    echo Installing dependencies for the first time...
     call npm install
 )
 
-echo [2/3] بناء وتشغيل الخادم المحلي على المنفذ 3000...
-echo [ملاحظة] يرجى عدم إغلاق هذه النافذة أثناء عمل النظام.
+echo [2/3] Starting local server on port 3000...
+echo [NOTE] Please keep this window open while using the system.
 echo.
 npm run start
 
