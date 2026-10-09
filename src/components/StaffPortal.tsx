@@ -363,7 +363,9 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
               >
                 <option value="">-- اضغط للاختيار --</option>
                 {staffList.filter(s => s.role === 'staff').map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id} disabled={!s.active}>
+                    {s.name} ({s.jobTitle || 'مندوب وكالات'}) {!s.active ? ' [موقف إدارياً]' : ''}
+                  </option>
                 ))}
               </select>
             </div>

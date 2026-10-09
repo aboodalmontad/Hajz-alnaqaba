@@ -83,6 +83,7 @@ interface Staff {
   counterId: string;
   active: boolean;
   role: 'staff' | 'admin';
+  jobTitle?: string;
   allowedCounterIds?: string[];
 }
 
@@ -173,9 +174,9 @@ const defaultDb: DatabaseSchema = {
   settings: defaultSettings,
   tickets: [],
   staff: [
-    { id: 'staff-1', name: 'أحمد المحمود', pin: '1234', counterId: '', active: true, role: 'staff' },
-    { id: 'staff-2', name: 'فاطمة الخطيب', pin: '2345', counterId: '', active: true, role: 'staff' },
-    { id: 'staff-3', name: 'محمد النجار', pin: '3456', counterId: '', active: true, role: 'staff' }
+    { id: 'staff-1', name: 'أحمد المحمود', pin: '1234', counterId: '', active: true, role: 'staff', jobTitle: 'مندوب وكالات' },
+    { id: 'staff-2', name: 'فاطمة الخطيب', pin: '2345', counterId: '', active: true, role: 'staff', jobTitle: 'مندوب وكالات' },
+    { id: 'staff-3', name: 'محمد النجار', pin: '3456', counterId: '', active: true, role: 'staff', jobTitle: 'موظف توثيق' }
   ],
   counters: [
     { id: 'counter-1', name: 'الشباك 1 (وكالات عامة)', isOpen: true, isPaused: false },
@@ -209,8 +210,17 @@ function ensureDataDir() {
 function loadDb(): DatabaseSchema {
   try {
     ensureDataDir();
+    let data: string | null = null;
     if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, 'utf8');
+      data = fs.readFileSync(DB_FILE, 'utf8');
+    } else {
+      const fallbackFile = join(os.tmpdir(), 'queue_db.json');
+      if (fs.existsSync(fallbackFile)) {
+        data = fs.readFileSync(fallbackFile, 'utf8');
+      }
+    }
+
+    if (data) {
       const loaded = JSON.parse(data) as DatabaseSchema;
       if (!loaded.settings) loaded.settings = { ...defaultSettings };
       if (!loaded.settings.categories) loaded.settings.categories = defaultSettings.categories;
@@ -221,6 +231,14 @@ function loadDb(): DatabaseSchema {
       if (typeof loaded.settings.soundAlertsEnabled !== 'boolean') loaded.settings.soundAlertsEnabled = true;
       if (!loaded.auditLogs) loaded.auditLogs = [];
       if (!loaded.counterSessions) loaded.counterSessions = [];
+      if (!loaded.staff || !Array.isArray(loaded.staff) || loaded.staff.length === 0) {
+        loaded.staff = [...defaultDb.staff];
+      } else {
+        // Ensure jobTitle exists
+        loaded.staff.forEach(s => {
+          if (!s.jobTitle) s.jobTitle = 'مندوب وكالات';
+        });
+      }
       // Clean up counters if missing fields
       loaded.counters = loaded.counters.map(c => ({
         ...c,
@@ -240,7 +258,13 @@ function saveDb(currentDb: DatabaseSchema) {
     ensureDataDir();
     fs.writeFileSync(DB_FILE, JSON.stringify(currentDb, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error saving DB:', err);
+    console.error('Error saving DB to primary location:', err);
+    try {
+      const fallbackFile = join(os.tmpdir(), 'queue_db.json');
+      fs.writeFileSync(fallbackFile, JSON.stringify(currentDb, null, 2), 'utf8');
+    } catch (fallbackErr) {
+      console.error('Error saving DB to fallback location:', fallbackErr);
+    }
   }
 }
 
@@ -909,7 +933,7 @@ app.get('/api/admin/staff', requireAdmin, (req, res) => {
 });
 
 app.post('/api/admin/staff', requireAdmin, (req, res) => {
-  const { id, name, pin, counterId, active, allowedCounterIds } = req.body;
+  const { id, name, pin, counterId, active, allowedCounterIds, jobTitle, role } = req.body;
 
   if (id) {
     const staff = db.staff.find(s => s.id === id);
@@ -918,29 +942,51 @@ app.post('/api/admin/staff', requireAdmin, (req, res) => {
     }
 
     const oldName = staff.name;
-    if (name) staff.name = name;
-    if (pin) staff.pin = pin;
+    if (name && typeof name === 'string' && name.trim()) {
+      staff.name = name.trim();
+    }
+    // Only update PIN if provided, non-empty, and not masked '****'
+    if (pin && typeof pin === 'string' && pin.trim() !== '' && pin.trim() !== '****') {
+      staff.pin = pin.trim();
+    }
     if (counterId !== undefined) staff.counterId = counterId;
     if (typeof active === 'boolean') staff.active = active;
     if (allowedCounterIds !== undefined) staff.allowedCounterIds = allowedCounterIds;
+    if (jobTitle !== undefined && typeof jobTitle === 'string') {
+      staff.jobTitle = jobTitle.trim() || 'مندوب وكالات';
+    }
+    if (role && (role === 'staff' || role === 'admin')) {
+      staff.role = role;
+    }
+
+    // Update active counter staff name if currently assigned
+    db.counters.forEach(c => {
+      if (c.currentStaffId === staff.id) {
+        c.currentStaffName = staff.name;
+      }
+    });
 
     saveDb(db);
     broadcastState();
 
-    logAudit('تعديل بيانات موظف', `تم تعديل بيانات الموظف ${oldName} (${staff.name})`, 'المدير العام', 'staff');
-    return res.json({ success: true, staff: db.staff });
+    logAudit('تعديل وحفظ بيانات موظف/مندوب', `تم حفظ وتعديل بيانات (${staff.jobTitle || 'مندوب'}) ${oldName} ${oldName !== staff.name ? `إلى (${staff.name})` : ''}`, 'المدير العام', 'staff');
+    return res.json({ success: true, message: `تم حفظ تعديلات ${staff.name} بنجاح.`, staff: db.staff, updatedStaff: staff });
   } else {
-    if (!name || !pin) {
-      return res.status(400).json({ error: 'الاسم والرمز الشخصي مطلوبان.' });
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'اسم الموظف أو مندوب الوكالات مطلوب.' });
+    }
+    if (!pin || typeof pin !== 'string' || !pin.trim()) {
+      return res.status(400).json({ error: 'الرمز الشخصي (PIN) مطلوب.' });
     }
 
     const newStaff: Staff = {
       id: `staff-${Date.now()}`,
-      name,
-      pin,
+      name: name.trim(),
+      pin: pin.trim(),
       counterId: counterId || '',
       active: typeof active === 'boolean' ? active : true,
-      role: 'staff',
+      role: role === 'admin' ? 'admin' : 'staff',
+      jobTitle: (jobTitle && typeof jobTitle === 'string' && jobTitle.trim()) ? jobTitle.trim() : 'مندوب وكالات',
       allowedCounterIds: allowedCounterIds || []
     };
 
@@ -948,8 +994,8 @@ app.post('/api/admin/staff', requireAdmin, (req, res) => {
     saveDb(db);
     broadcastState();
 
-    logAudit('إضافة موظف جديد', `تمت إضافة الموظف ${newStaff.name} بنجاح`, 'المدير العام', 'staff');
-    return res.json({ success: true, staff: db.staff, newStaff });
+    logAudit('إضافة وحفظ موظف/مندوب جديد', `تمت إضافة وحفظ حساب (${newStaff.jobTitle}) ${newStaff.name} بنجاح`, 'المدير العام', 'staff');
+    return res.json({ success: true, message: `تمت إضافة ${newStaff.name} وحفظه بنجاح.`, staff: db.staff, newStaff });
   }
 });
 
@@ -961,6 +1007,7 @@ app.delete('/api/admin/staff/:id', requireAdmin, (req, res) => {
   }
 
   const staffName = db.staff[index].name;
+  const staffTitle = db.staff[index].jobTitle || 'الموظف';
   db.staff.splice(index, 1);
 
   // Clear assigned staff from counters
@@ -976,8 +1023,8 @@ app.delete('/api/admin/staff/:id', requireAdmin, (req, res) => {
   saveDb(db);
   broadcastState();
 
-  logAudit('حذف موظف', `تم حذف حساب الموظف ${staffName} من النظام`, 'المدير العام', 'staff');
-  res.json({ success: true, message: `تم حذف الموظف ${staffName} بنجاح.` });
+  logAudit('حذف حساب موظف/مندوب', `تم حذف حساب ${staffTitle} ${staffName} من النظام نهائياً`, 'المدير العام', 'staff');
+  res.json({ success: true, message: `تم حذف حساب ${staffName} بنجاح.`, staff: db.staff });
 });
 
 // Admin Force Release Counter
@@ -1066,6 +1113,30 @@ app.get('/api/admin/counter-sessions', requireAdmin, (req, res) => {
   res.json(db.counterSessions);
 });
 
+// Delete specific counter session
+app.delete('/api/admin/counter-sessions/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const index = db.counterSessions.findIndex(cs => cs.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'سجل المناوبة غير موجود.' });
+  }
+  const deleted = db.counterSessions.splice(index, 1)[0];
+  saveDb(db);
+  broadcastState();
+  logAudit('حذف سجل مناوبة', `قام المدير العام بحذف سجل مناوبة (${deleted.staffName} على ${deleted.counterName})`, 'المدير العام', 'counter');
+  res.json({ success: true, message: 'تم حذف سجل المناوبة بنجاح.', counterSessions: db.counterSessions });
+});
+
+// Clear all counter sessions
+app.delete('/api/admin/counter-sessions', requireAdmin, (req, res) => {
+  const count = db.counterSessions.length;
+  db.counterSessions = [];
+  saveDb(db);
+  broadcastState();
+  logAudit('مسح سجلات المناوبات', `قام المدير العام بمسح كافة سجلات المناوبات (${count} سجل)`, 'المدير العام', 'counter');
+  res.json({ success: true, message: `تم مسح جميع سجلات المناوبات (${count} سجل) بنجاح.` });
+});
+
 // ==========================================
 // ADMIN: COUNTERS MANAGEMENT (CRUD)
 // ==========================================
@@ -1142,6 +1213,89 @@ app.delete('/api/admin/counters/:id', requireAdmin, (req, res) => {
 
 app.get('/api/admin/tickets', requireAdmin, (req, res) => {
   res.json(db.tickets);
+});
+
+// Admin add new ticket manually
+app.post('/api/admin/tickets', requireAdmin, (req, res) => {
+  const { category, displayNumber, status = 'waiting', counterId, staffId, notes } = req.body;
+
+  const catConfig = db.settings.categories.find(c => c.id === category) || db.settings.categories[0] || {
+    id: 'general',
+    prefix: 'A',
+    name: 'وكالات عامة',
+    desc: ''
+  };
+
+  db.ticketSequence += 1;
+  const num = db.ticketSequence;
+  const autoDisplay = `${catConfig.prefix}-${String(num).padStart(3, '0')}`;
+  const finalDisplay = (displayNumber && typeof displayNumber === 'string' && displayNumber.trim()) 
+    ? displayNumber.trim() 
+    : autoDisplay;
+
+  // Duplicate check
+  const duplicate = db.tickets.find(t => t.displayNumber === finalDisplay);
+  if (duplicate) {
+    return res.status(400).json({ error: `رقم الدور (${finalDisplay}) مسجل بالفعل اليوم.` });
+  }
+
+  let counterName: string | undefined = undefined;
+  if (counterId) {
+    const counter = db.counters.find(c => c.id === counterId);
+    if (counter) counterName = counter.name;
+  }
+
+  let staffName: string | undefined = undefined;
+  if (staffId) {
+    const staff = db.staff.find(s => s.id === staffId);
+    if (staff) staffName = staff.name;
+  }
+
+  const newTicket: Ticket = {
+    id: `ticket-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    number: num,
+    displayNumber: finalDisplay,
+    category: catConfig.id,
+    categoryNameArabic: catConfig.name,
+    status: status || 'waiting',
+    createdAt: new Date().toISOString(),
+    counterId: counterId || undefined,
+    counterName,
+    staffId: staffId || undefined,
+    staffName,
+    notes: notes || 'تمت الإضافة يدوياً بواسطة المدير العام'
+  };
+
+  if (status === 'serving') {
+    newTicket.calledAt = new Date().toISOString();
+  } else if (status === 'completed') {
+    newTicket.completedAt = new Date().toISOString();
+  }
+
+  db.tickets.unshift(newTicket);
+  saveDb(db);
+  broadcastState();
+
+  logAudit(
+    'إضافة تذكرة يدوياً',
+    `قام المدير العام بإضافة تذكرة جديدة برقم ${newTicket.displayNumber} (${newTicket.categoryNameArabic})`,
+    'المدير العام',
+    'ticket'
+  );
+
+  res.json({ success: true, message: `تمت إضافة التذكرة ${newTicket.displayNumber} بنجاح.`, ticket: newTicket, tickets: db.tickets });
+});
+
+// Admin delete all tickets today
+app.delete('/api/admin/tickets', requireAdmin, (req, res) => {
+  const count = db.tickets.length;
+  db.tickets = [];
+  db.ticketSequence = 0;
+  saveDb(db);
+  broadcastState();
+
+  logAudit('مسح جميع التذاكر', `قام المدير العام بمسح وتصفير كافة تذاكر اليوم (العدد: ${count})`, 'المدير العام', 'ticket');
+  res.json({ success: true, message: `تم مسح جميع تذاكر اليوم (${count} تذكرة) بنجاح.` });
 });
 
 app.put('/api/admin/tickets/:id', requireAdmin, (req, res) => {
@@ -1343,6 +1497,90 @@ app.put('/api/admin/settings', requireAdmin, (req, res) => {
   res.json({ success: true, settings: db.settings });
 });
 
+// ==========================================
+// ADMIN: CATEGORIES & SERVICES CRUD
+// ==========================================
+
+app.get('/api/admin/categories', requireAdmin, (req, res) => {
+  res.json(db.settings.categories);
+});
+
+app.post('/api/admin/categories', requireAdmin, (req, res) => {
+  const { name, prefix, desc, id } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'اسم فئة المعاملة مطلوب.' });
+  }
+
+  const cleanPrefix = (prefix && typeof prefix === 'string' && prefix.trim()) 
+    ? prefix.trim().toUpperCase().slice(0, 3) 
+    : String.fromCharCode(65 + db.settings.categories.length);
+
+  const cleanId = (id && typeof id === 'string' && id.trim()) 
+    ? id.trim().toLowerCase().replace(/\s+/g, '_') 
+    : `cat_${Date.now()}`;
+
+  // Check prefix or id collision
+  if (db.settings.categories.some(c => c.id === cleanId)) {
+    return res.status(400).json({ error: 'رمز تعريف الفئة مستخدم مسبقاً.' });
+  }
+
+  const newCat: CategoryConfig = {
+    id: cleanId,
+    name: name.trim(),
+    prefix: cleanPrefix,
+    desc: (desc && typeof desc === 'string') ? desc.trim() : ''
+  };
+
+  db.settings.categories.push(newCat);
+  saveDb(db);
+  broadcastState();
+
+  logAudit('إضافة فئة خدمة/معاملة', `تمت إضافة فئة جديدة: ${newCat.name} (رمز: ${newCat.prefix})`, 'المدير العام', 'settings');
+  res.json({ success: true, message: `تمت إضافة فئة (${newCat.name}) بنجاح.`, category: newCat, categories: db.settings.categories });
+});
+
+app.put('/api/admin/categories/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { name, prefix, desc } = req.body;
+
+  const cat = db.settings.categories.find(c => c.id === id);
+  if (!cat) {
+    return res.status(404).json({ error: 'فئة المعاملة غير موجودة.' });
+  }
+
+  const oldName = cat.name;
+  if (name && typeof name === 'string' && name.trim()) cat.name = name.trim();
+  if (prefix && typeof prefix === 'string' && prefix.trim()) cat.prefix = prefix.trim().toUpperCase().slice(0, 3);
+  if (desc !== undefined && typeof desc === 'string') cat.desc = desc.trim();
+
+  saveDb(db);
+  broadcastState();
+
+  logAudit('تعديل فئة خدمة/معاملة', `تم تعديل بيانات فئة (${oldName}) ${oldName !== cat.name ? `إلى (${cat.name})` : ''}`, 'المدير العام', 'settings');
+  res.json({ success: true, message: `تم تحديث فئة (${cat.name}) بنجاح.`, category: cat, categories: db.settings.categories });
+});
+
+app.delete('/api/admin/categories/:id', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  if (db.settings.categories.length <= 1) {
+    return res.status(400).json({ error: 'يجب أن يحتوي النظام على فئة خدمة واحدة على الأقل.' });
+  }
+
+  const index = db.settings.categories.findIndex(c => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'فئة المعاملة غير موجودة.' });
+  }
+
+  const catName = db.settings.categories[index].name;
+  db.settings.categories.splice(index, 1);
+
+  saveDb(db);
+  broadcastState();
+
+  logAudit('حذف فئة خدمة/معاملة', `تم حذف فئة (${catName}) من النظام`, 'المدير العام', 'settings');
+  res.json({ success: true, message: `تم حذف فئة (${catName}) بنجاح.`, categories: db.settings.categories });
+});
+
 app.post('/api/admin/toggle-issuance', requireAdmin, (req, res) => {
   db.issuancePaused = !db.issuancePaused;
   saveDb(db);
@@ -1456,6 +1694,26 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
 
 app.get('/api/admin/logs', requireAdmin, (req, res) => {
   res.json(db.auditLogs);
+});
+
+// Clear audit logs
+app.delete('/api/admin/logs', requireAdmin, (req, res) => {
+  const count = db.auditLogs.length;
+  db.auditLogs = [];
+  saveDb(db);
+  broadcastState();
+  logAudit('مسح سجل العمليات', `قام المدير العام بمسح وتفريغ سجل العمليات السابق (${count} حركة)`, 'المدير العام', 'system');
+  res.json({ success: true, message: `تم مسح سجل العمليات (${count} حركة) بنجاح.` });
+});
+
+// Factory reset entire database
+app.post('/api/admin/reset-database', requireAdmin, (req, res) => {
+  db = JSON.parse(JSON.stringify(defaultDb));
+  db.date = getTodayDateString();
+  saveDb(db);
+  broadcastState();
+  logAudit('إعادة ضبط المصنع', 'قام المدير العام بإعادة ضبط كافة بيانات المنصة إلى الوضع الافتراضي النظيف', 'المدير العام', 'system');
+  res.json({ success: true, message: 'تمت إعادة ضبط جميع بيانات المنصة إلى الوضع الافتراضي بنجاح.' });
 });
 
 // Socket.io connection handling

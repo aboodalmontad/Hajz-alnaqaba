@@ -63,7 +63,14 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'kiosk' | 'display' | 'staff' | 'admin'>(getInitialTab);
   const [connected, setConnected] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>(() => {
+    try {
+      const b = localStorage.getItem('agency_staff_backup');
+      return b ? JSON.parse(b) : [];
+    } catch {
+      return [];
+    }
+  });
   const [counters, setCounters] = useState<Counter[]>([]);
   const [issuancePaused, setIssuancePaused] = useState(false);
   const [date, setDate] = useState('');
@@ -103,7 +110,10 @@ export default function App() {
       .then(data => {
         setConnected(true);
         if (data.tickets) setTickets(data.tickets);
-        if (data.staff) setStaffList(data.staff);
+        if (data.staff) {
+          setStaffList(data.staff);
+          try { localStorage.setItem('agency_staff_backup', JSON.stringify(data.staff)); } catch {}
+        }
         if (data.counters) setCounters(data.counters);
         if (data.counterSessions) setCounterSessions(data.counterSessions);
         if (typeof data.issuancePaused === 'boolean') setIssuancePaused(data.issuancePaused);
@@ -164,7 +174,10 @@ export default function App() {
 
       socket.on('state_update', (state) => {
         if (state.tickets) setTickets(state.tickets);
-        if (state.staff) setStaffList(state.staff);
+        if (state.staff) {
+          setStaffList(state.staff);
+          try { localStorage.setItem('agency_staff_backup', JSON.stringify(state.staff)); } catch {}
+        }
         if (state.counters) setCounters(state.counters);
         if (state.counterSessions) setCounterSessions(state.counterSessions);
         if (typeof state.issuancePaused === 'boolean') setIssuancePaused(state.issuancePaused);

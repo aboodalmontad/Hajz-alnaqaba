@@ -28,6 +28,7 @@ export interface Staff {
   counterId: string;
   active: boolean;
   role: 'staff' | 'admin';
+  jobTitle?: string; // e.g. 'مندوب وكالات' | 'موظف توثيق' | 'موظف شباك' | 'أمين صندوق'
   allowedCounterIds?: string[]; // If undefined or empty, allowed on all counters
 }
 

@@ -38,10 +38,15 @@ import {
   Smartphone,
   Copy,
   ExternalLink,
-  QrCode
+  QrCode,
+  Eye,
+  EyeOff,
+  Database,
+  Tag,
+  Sparkles
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Staff, Counter, Ticket, AuditLog, SystemSettings, CounterSession } from '../types';
+import { Staff, Counter, Ticket, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
 
 interface AdminDashboardProps {
@@ -83,7 +88,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs'>('data_management');
-  const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts'>('counters');
+  const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts' | 'categories' | 'database'>('counters');
 
   // Agent QR URL calculation
   const baseUrl = resolveBaseUrl(localIPs, port, serverAppUrl);
@@ -96,21 +101,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [logSearch, setLogSearch] = useState('');
   const [shiftSearch, setShiftSearch] = useState('');
 
-  // Modals & form states
+  // Modals & form states (Tickets)
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [showAddTicketModal, setShowAddTicketModal] = useState(false);
   const [ticketFormNumber, setTicketFormNumber] = useState('');
   const [ticketFormStatus, setTicketFormStatus] = useState<Ticket['status']>('waiting');
   const [ticketFormCounter, setTicketFormCounter] = useState('');
+  const [ticketFormStaff, setTicketFormStaff] = useState('');
+  const [ticketFormCategory, setTicketFormCategory] = useState('');
   const [ticketFormNotes, setTicketFormNotes] = useState('');
+  const [ticketFormSeqNumber, setTicketFormSeqNumber] = useState<number | undefined>(undefined);
+
+  // Categories forms
+  const [editingCategory, setEditingCategory] = useState<CategoryConfig | null>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryFormName, setCategoryFormName] = useState('');
+  const [categoryFormPrefix, setCategoryFormPrefix] = useState('');
+  const [categoryFormDesc, setCategoryFormDesc] = useState('');
+  const [categoryFormId, setCategoryFormId] = useState('');
+
+  // Raw Database Editor
+  const [showRawDbModal, setShowRawDbModal] = useState(false);
+  const [rawDbContent, setRawDbContent] = useState('');
+  const [rawDbLoading, setRawDbLoading] = useState(false);
 
   // Staff forms
+  const [adminStaffList, setAdminStaffList] = useState<Staff[]>(staffList);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [staffFormName, setStaffFormName] = useState('');
   const [staffFormPin, setStaffFormPin] = useState('');
   const [staffFormCounter, setStaffFormCounter] = useState('');
   const [staffFormActive, setStaffFormActive] = useState(true);
+  const [staffFormJobTitle, setStaffFormJobTitle] = useState('مندوب وكالات');
+  const [staffFormRole, setStaffFormRole] = useState<'staff' | 'admin'>('staff');
   const [staffFormAllowedCounters, setStaffFormAllowedCounters] = useState<string[]>([]);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [savingStaffLoading, setSavingStaffLoading] = useState(false);
+  const [showPinInCards, setShowPinInCards] = useState<Record<string, boolean>>({});
+  const [showPinInput, setShowPinInput] = useState(false);
 
   // Counter forms
   const [editingCounter, setEditingCounter] = useState<Counter | null>(null);
@@ -147,6 +175,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setFormSettings(settings);
     }
   }, [settings]);
+
+  // Keep adminStaffList synced with incoming staffList props
+  useEffect(() => {
+    if (staffList && staffList.length > 0) {
+      setAdminStaffList(prev => {
+        return staffList.map(s => {
+          const existing = prev.find(p => p.id === s.id);
+          return {
+            ...s,
+            pin: (existing && existing.pin && existing.pin !== '****') ? existing.pin : s.pin,
+            jobTitle: s.jobTitle || (existing ? existing.jobTitle : 'مندوب وكالات')
+          };
+        });
+      });
+    }
+  }, [staffList]);
+
+  // Fetch full staff list with unmasked PINs when admin token is available
+  const fetchAdminStaffList = async (tokenOverride?: string) => {
+    const token = tokenOverride || adminToken;
+    if (!token) return;
+    try {
+      const data = await apiFetch('/api/admin/staff', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-admin-token': token
+        }
+      });
+      if (Array.isArray(data)) {
+        setAdminStaffList(data);
+      }
+    } catch (e) {
+      // Fallback to props
+    }
+  };
+
+  useEffect(() => {
+    if (adminToken) {
+      fetchAdminStaffList();
+    }
+  }, [adminToken]);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text });
@@ -191,6 +261,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setAdminToken(data.token);
       sessionStorage.setItem('agency_admin_token', data.token);
       setAdminPinInput('');
+      fetchAdminStaffList(data.token);
       onRefreshState();
       showToast('success', 'مرحباً بك، تم التحقق من صلاحيات المدير العام.');
     } catch (err: any) {
@@ -329,7 +400,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTicketFormNumber(ticket.displayNumber);
     setTicketFormStatus(ticket.status);
     setTicketFormCounter(ticket.counterId || '');
+    setTicketFormStaff(ticket.staffId || '');
     setTicketFormNotes(ticket.notes || '');
+  };
+
+  const handleCreateTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const data = await adminFetch('/api/admin/tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          category: ticketFormCategory || (settings?.categories?.[0]?.id || 'general'),
+          displayNumber: ticketFormNumber,
+          status: ticketFormStatus,
+          counterId: ticketFormCounter,
+          staffId: ticketFormStaff,
+          notes: ticketFormNotes
+        })
+      });
+      setShowAddTicketModal(false);
+      setTicketFormNumber('');
+      setTicketFormCounter('');
+      setTicketFormStaff('');
+      setTicketFormNotes('');
+      setTicketFormStatus('waiting');
+      onRefreshState();
+      showToast('success', data.message || 'تمت إضافة التذكرة بنجاح.');
+    } catch (err: any) {
+      showToast('error', err.message || 'فشلت إضافة التذكرة.');
+    }
+  };
+
+  const handleClearAllTickets = () => {
+    setConfirmModal({
+      title: 'مسح وتصفير كافة تذاكر اليوم',
+      message: 'هل أنت متأكد من مسح جميع التذاكر الحالية وتصفير عداد التذاكر؟ هذا الإجراء سيفرغ طابور الانتظار بالكامل.',
+      onConfirm: async () => {
+        try {
+          const data = await adminFetch('/api/admin/tickets', { method: 'DELETE' });
+          onRefreshState();
+          showToast('success', data.message || 'تم مسح جميع التذاكر بنجاح.');
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      }
+    });
   };
 
   const handleSaveTicket = async (e: React.FormEvent) => {
@@ -343,14 +458,171 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           displayNumber: ticketFormNumber,
           status: ticketFormStatus,
           counterId: ticketFormCounter,
+          staffId: ticketFormStaff,
           notes: ticketFormNotes
         })
       });
       setEditingTicket(null);
       onRefreshState();
-      showToast('success', `تم تعديل بيانات التذكرة ${ticketFormNumber} بنجاح.`);
+      showToast('success', `تم تعديل وحفظ بيانات التذكرة ${ticketFormNumber} بنجاح.`);
     } catch (err: any) {
       showToast('error', err.message);
+    }
+  };
+
+  // ----------------------------------------------------
+  // CATEGORIES / SERVICES ACTIONS
+  // ----------------------------------------------------
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCategory) {
+        const data = await adminFetch(`/api/admin/categories/${editingCategory.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: categoryFormName,
+            prefix: categoryFormPrefix,
+            desc: categoryFormDesc
+          })
+        });
+        showToast('success', data.message || 'تم تحديث فئة الخدمة بنجاح.');
+      } else {
+        const data = await adminFetch('/api/admin/categories', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: categoryFormId,
+            name: categoryFormName,
+            prefix: categoryFormPrefix,
+            desc: categoryFormDesc
+          })
+        });
+        showToast('success', data.message || 'تمت إضافة فئة الخدمة بنجاح.');
+      }
+      setShowCategoryModal(false);
+      setEditingCategory(null);
+      setCategoryFormName('');
+      setCategoryFormPrefix('');
+      setCategoryFormDesc('');
+      setCategoryFormId('');
+      onRefreshState();
+    } catch (err: any) {
+      showToast('error', err.message);
+    }
+  };
+
+  const handleDeleteCategory = (cat: CategoryConfig) => {
+    setConfirmModal({
+      title: 'حذف فئة معاملة / خدمة',
+      message: `هل أنت متأكد من حذف فئة (${cat.name}) ورمزها (${cat.prefix}) نهائياً من النظام؟`,
+      onConfirm: async () => {
+        try {
+          const data = await adminFetch(`/api/admin/categories/${cat.id}`, { method: 'DELETE' });
+          onRefreshState();
+          showToast('success', data.message || 'تم حذف فئة الخدمة بنجاح.');
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      }
+    });
+  };
+
+  // ----------------------------------------------------
+  // SESSIONS / SHIFTS ACTIONS
+  // ----------------------------------------------------
+  const handleDeleteSession = (sessionId: string) => {
+    setConfirmModal({
+      title: 'حذف سجل مناوبة',
+      message: 'هل أنت متأكد من حذف هذا السجل من تاريخ المناوبات؟',
+      onConfirm: async () => {
+        try {
+          const data = await adminFetch(`/api/admin/counter-sessions/${sessionId}`, { method: 'DELETE' });
+          onRefreshState();
+          showToast('success', data.message || 'تم حذف سجل المناوبة بنجاح.');
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      }
+    });
+  };
+
+  const handleClearAllSessions = () => {
+    setConfirmModal({
+      title: 'مسح كافة سجلات المناوبات',
+      message: 'هل أنت متأكد من مسح وتفريغ تاريخ مناوبات الشبابيك بالكامل؟',
+      onConfirm: async () => {
+        try {
+          const data = await adminFetch('/api/admin/counter-sessions', { method: 'DELETE' });
+          onRefreshState();
+          showToast('success', data.message || 'تم مسح سجلات المناوبات بنجاح.');
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      }
+    });
+  };
+
+  // ----------------------------------------------------
+  // AUDIT LOGS & DATABASE ACTIONS
+  // ----------------------------------------------------
+  const handleClearLogs = () => {
+    setConfirmModal({
+      title: 'مسح وتفريغ سجل العمليات والتدقيق',
+      message: 'هل أنت متأكد من مسح سجل العمليات والرقابة بالكامل؟ هذا الإجراء لا يمكن التراجع عنه.',
+      onConfirm: async () => {
+        try {
+          const data = await adminFetch('/api/admin/logs', { method: 'DELETE' });
+          onRefreshState();
+          showToast('success', data.message || 'تم مسح سجل العمليات بنجاح.');
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      }
+    });
+  };
+
+  const handleResetDatabase = () => {
+    setConfirmModal({
+      title: 'إعادة ضبط المصنع لجميع بيانات المنصة',
+      message: 'تحذير شديد: سيتم مسح وتصفير كافة بيانات التذاكر والشبابيك وحسابات الموظفين وإعادتها إلى الوضع الافتراضي النظيف. هل تؤكد المتابعة؟',
+      onConfirm: async () => {
+        try {
+          const data = await adminFetch('/api/admin/reset-database', { method: 'POST' });
+          onRefreshState();
+          showToast('success', data.message || 'تمت إعادة ضبط المنصة بالكامل.');
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      }
+    });
+  };
+
+  const handleOpenRawDb = async () => {
+    setRawDbLoading(true);
+    try {
+      const res = await fetch(`/api/admin/backup?token=${adminToken}`);
+      if (!res.ok) throw new Error('فشل جلب بيانات قاعدة البيانات');
+      const json = await res.json();
+      setRawDbContent(JSON.stringify(json, null, 2));
+      setShowRawDbModal(true);
+    } catch (err: any) {
+      showToast('error', err.message || 'فشل جلب البيانات الخام.');
+    } finally {
+      setRawDbLoading(false);
+    }
+  };
+
+  const handleSaveRawDb = async () => {
+    try {
+      const parsed = JSON.parse(rawDbContent);
+      const data = await adminFetch('/api/admin/restore', {
+        method: 'POST',
+        body: JSON.stringify(parsed)
+      });
+      setShowRawDbModal(false);
+      onRefreshState();
+      showToast('success', data.message || 'تم حفظ وتحديث قاعدة البيانات الخام بنجاح.');
+    } catch (err: any) {
+      showToast('error', `صيغة JSON غير صحيحة أو فشل الحفظ: ${err.message}`);
     }
   };
 
@@ -490,54 +762,83 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ----------------------------------------------------
   const handleSaveStaff = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!staffFormName.trim()) {
+      showToast('error', 'يرجى إدخال اسم الموظف أو مندوب الوكالات.');
+      return;
+    }
+
+    if (!editingStaff && !staffFormPin.trim()) {
+      showToast('error', 'يرجى إدخال الرمز السري الشخصي (PIN).');
+      return;
+    }
+
+    setSavingStaffLoading(true);
     try {
       if (editingStaff) {
-        await adminFetch('/api/admin/staff', {
+        const data = await adminFetch('/api/admin/staff', {
           method: 'POST',
           body: JSON.stringify({
             id: editingStaff.id,
-            name: staffFormName,
-            pin: staffFormPin,
+            name: staffFormName.trim(),
+            pin: staffFormPin.trim(),
             counterId: staffFormCounter,
             active: staffFormActive,
+            jobTitle: staffFormJobTitle.trim() || 'مندوب وكالات',
+            role: staffFormRole,
             allowedCounterIds: staffFormAllowedCounters
           })
         });
+        if (data.staff && Array.isArray(data.staff)) {
+          setAdminStaffList(data.staff);
+        }
         setEditingStaff(null);
-        showToast('success', `تم تعديل بيانات الموظف ${staffFormName} بنجاح.`);
+        setShowAddStaffModal(false);
+        showToast('success', `تم حفظ وتعديل بيانات (${staffFormName}) بنجاح.`);
       } else {
-        await adminFetch('/api/admin/staff', {
+        const data = await adminFetch('/api/admin/staff', {
           method: 'POST',
           body: JSON.stringify({
-            name: staffFormName,
-            pin: staffFormPin,
+            name: staffFormName.trim(),
+            pin: staffFormPin.trim(),
             counterId: staffFormCounter,
             active: staffFormActive,
+            jobTitle: staffFormJobTitle.trim() || 'مندوب وكالات',
+            role: staffFormRole,
             allowedCounterIds: staffFormAllowedCounters
           })
         });
+        if (data.staff && Array.isArray(data.staff)) {
+          setAdminStaffList(data.staff);
+        }
         setShowAddStaffModal(false);
-        showToast('success', `تمت إضافة الموظف الجديد ${staffFormName} بنجاح.`);
+        showToast('success', `تمت إضافة وحفظ الموظف/المندوب الجديد (${staffFormName}) بنجاح.`);
       }
       setStaffFormName('');
       setStaffFormPin('');
       setStaffFormCounter('');
+      setStaffFormJobTitle('مندوب وكالات');
+      setStaffFormRole('staff');
       setStaffFormAllowedCounters([]);
       onRefreshState();
     } catch (err: any) {
-      showToast('error', err.message);
+      showToast('error', err.message || 'حدث خطأ أثناء حفظ بيانات الموظف.');
+    } finally {
+      setSavingStaffLoading(false);
     }
   };
 
   const handleDeleteStaff = (staff: Staff) => {
     setConfirmModal({
-      title: 'حذف حساب موظف',
-      message: `هل أنت متأكد من حذف الموظف ${staff.name}؟ سيتم إلغاء حسابه ورمزه من النظام.`,
+      title: 'حذف حساب موظف / مندوب وكالات',
+      message: `هل أنت متأكد من حذف حساب (${staff.name}) نهائياً؟ سيتم إلغاء حسابه ورمزه السري وفك ارتباطه بأي شباك.`,
       onConfirm: async () => {
         try {
-          await adminFetch(`/api/admin/staff/${staff.id}`, { method: 'DELETE' });
+          const data = await adminFetch(`/api/admin/staff/${staff.id}`, { method: 'DELETE' });
+          if (data.staff && Array.isArray(data.staff)) {
+            setAdminStaffList(data.staff);
+          }
           onRefreshState();
-          showToast('success', `تم حذف حساب ${staff.name} بنجاح.`);
+          showToast('success', `تم حذف حساب ${staff.name} وحفظ التغييرات بنجاح.`);
         } catch (err: any) {
           showToast('error', err.message);
         }
@@ -824,12 +1125,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>الموظفون والصلاحيات ({staffList.length})</span>
             </button>
             <button
+              onClick={() => setDataSubTab('categories')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                dataSubTab === 'categories' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <span>فئات الخدمات والمعاملات ({settings?.categories?.length || 0})</span>
+            </button>
+            <button
               onClick={() => setDataSubTab('shifts')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
                 dataSubTab === 'shifts' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               <span>سجل مناوبات الشبابيك ({counterSessions.length})</span>
+            </button>
+            <button
+              onClick={() => setDataSubTab('database')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                dataSubTab === 'database' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-amber-500" />
+              <span>إدارة قاعدة البيانات الخام (JSON)</span>
             </button>
           </div>
 
@@ -965,6 +1283,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {dataSubTab === 'tickets' && (
             <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
               
+              {/* Header with Title and CRUD Buttons */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">إدارة وتعديل تذاكر الدور</h3>
+                  <p className="text-xs text-slate-500">إمكانية إضافة تذاكر يدوياً، تعديل الحالة، إعادة النداء، نقل الدور، أو الحذف والتصفير الشامل</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setTicketFormCategory(settings?.categories?.[0]?.id || 'general');
+                      setTicketFormNumber('');
+                      setTicketFormStatus('waiting');
+                      setTicketFormCounter('');
+                      setTicketFormStaff('');
+                      setTicketFormNotes('');
+                      setShowAddTicketModal(true);
+                    }}
+                    className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Plus className="w-4 h-4" /> إضافة تذكرة دور جديدة
+                  </button>
+                  <button
+                    onClick={handleClearAllTickets}
+                    className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" /> تصفير ومسح كافة التذاكر
+                  </button>
+                </div>
+              </div>
+
               {/* Table Toolbar */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative w-full sm:w-80">
@@ -1123,10 +1471,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* SUBTAB: STAFF & PERMISSIONS */}
           {dataSubTab === 'staff' && (
             <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">إدارة حسابات الموظفين ومندوبي الوكالات</h3>
-                  <p className="text-xs text-slate-500">إضافة الموظفين، تحديد الشبابيك المصرح لهم باستخدامها، وتفعيل أو إيقاف الحسابات</p>
+                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <span>إدارة حسابات الموظفين ومندوبي الوكالات</span>
+                    <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                      {(adminStaffList.length || staffList.length)} حساب
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    إضافة الموظفين ومندوبي الوكالات وتعديل بياناتهم وحفظها فورياً في قاعدة البيانات
+                  </p>
                 </div>
                 <button
                   onClick={() => {
@@ -1135,40 +1490,76 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     setStaffFormPin('');
                     setStaffFormCounter('');
                     setStaffFormActive(true);
+                    setStaffFormJobTitle('مندوب وكالات');
+                    setStaffFormRole('staff');
                     setStaffFormAllowedCounters([]);
                     setShowAddStaffModal(true);
                   }}
-                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm"
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
                 >
-                  <Plus className="w-4 h-4" /> إضافة موظف جديد
+                  <Plus className="w-4 h-4" /> إضافة موظف / مندوب جديد
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {staffList.map(staff => {
+                {(adminStaffList.length > 0 ? adminStaffList : staffList).map(staff => {
                   const assignedCounter = counters.find(c => c.id === staff.counterId);
                   const allowedCounterNames = (staff.allowedCounterIds && staff.allowedCounterIds.length > 0)
                     ? staff.allowedCounterIds.map(id => counters.find(c => c.id === id)?.name || id).join('، ')
                     : 'جميع الشبابيك متاحة';
+                  const isPinRevealed = showPinInCards[staff.id];
 
                   return (
-                    <div key={staff.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                            {staff.name}
-                            {staff.role === 'admin' && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-md font-bold">مسؤول</span>}
-                          </h4>
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                    <div key={staff.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4 flex flex-col justify-between hover:border-amber-300 transition-colors">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                              <span>{staff.name}</span>
+                              {staff.role === 'admin' && (
+                                <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-md font-bold">
+                                  مسؤول
+                                </span>
+                              )}
+                            </h4>
+                            <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-200">
+                              {staff.jobTitle || 'مندوب وكالات'}
+                            </div>
+                          </div>
+                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
                             staff.active ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                           }`}>
                             {staff.active ? 'مفعل' : 'موقف'}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-600 space-y-1">
-                          <div>الشباك الحالي: <strong className="text-slate-800">{assignedCounter ? assignedCounter.name : 'غير محجوز'}</strong></div>
-                          <div>الشبابيك المسموحة: <span className="text-slate-700 font-medium">{allowedCounterNames}</span></div>
-                          <div className="font-mono text-slate-500">الرمز السري (PIN): <strong className="text-amber-800 tracking-wider">{staff.pin}</strong></div>
+
+                        <div className="text-xs text-slate-600 space-y-1.5 pt-1 border-t border-slate-200/60">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">الشباك الحالي:</span>
+                            <strong className="text-slate-800">{assignedCounter ? assignedCounter.name : 'غير محجوز'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block mb-0.5">الشبابيك المسموحة:</span>
+                            <span className="text-slate-700 font-medium bg-white px-2 py-1 rounded-lg border border-slate-200 block text-[11px]">
+                              {allowedCounterNames}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between bg-amber-50/70 p-2 rounded-xl border border-amber-200/60 font-mono text-xs">
+                            <span className="text-amber-900 font-sans text-[11px] font-bold">الرمز السري (PIN):</span>
+                            <div className="flex items-center gap-2">
+                              <strong className="text-amber-950 font-bold tracking-widest text-sm">
+                                {isPinRevealed ? staff.pin : '••••'}
+                              </strong>
+                              <button
+                                type="button"
+                                onClick={() => setShowPinInCards(prev => ({ ...prev, [staff.id]: !prev[staff.id] }))}
+                                className="text-amber-700 hover:text-amber-900 p-1"
+                                title={isPinRevealed ? 'إخفاء الرمز' : 'إظهار الرمز'}
+                              >
+                                {isPinRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -1177,20 +1568,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           onClick={() => {
                             setEditingStaff(staff);
                             setStaffFormName(staff.name);
-                            setStaffFormPin(staff.pin);
+                            setStaffFormPin(staff.pin !== '****' ? staff.pin : '');
                             setStaffFormCounter(staff.counterId || '');
                             setStaffFormActive(staff.active);
+                            setStaffFormJobTitle(staff.jobTitle || 'مندوب وكالات');
+                            setStaffFormRole(staff.role || 'staff');
                             setStaffFormAllowedCounters(staff.allowedCounterIds || []);
                             setShowAddStaffModal(true);
                           }}
-                          className="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                          className="flex-1 py-2 bg-slate-200 hover:bg-amber-100 hover:text-amber-900 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                         >
-                          <Edit3 className="w-3.5 h-3.5" /> تعديل / صلاحيات الشبابيك
+                          <Edit3 className="w-3.5 h-3.5" /> تعديل وحفظ البيانات
                         </button>
                         <button
                           onClick={() => handleDeleteStaff(staff)}
                           className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl transition-colors"
-                          title="حذف الحساب"
+                          title="حذف الحساب نهائياً"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1205,20 +1598,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* SUBTAB: SHIFT SESSIONS LOG */}
           {dataSubTab === 'shifts' && (
             <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">سجل مناوبات العمل على الشبابيك</h3>
                   <p className="text-xs text-slate-500">يوثق أوقات استلام وتسليم الشبابيك من قبل مندوبي الوكالات</p>
                 </div>
-                <div className="relative w-full sm:w-72">
-                  <input
-                    type="text"
-                    value={shiftSearch}
-                    onChange={e => setShiftSearch(e.target.value)}
-                    placeholder="بحث باسم المندوب أو الشباك..."
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-amber-500 pr-9"
-                  />
-                  <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <input
+                      type="text"
+                      value={shiftSearch}
+                      onChange={e => setShiftSearch(e.target.value)}
+                      placeholder="بحث بالمندوب أو الشباك..."
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-amber-500 pr-9"
+                    />
+                    <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+                  </div>
+                  {counterSessions.length > 0 && (
+                    <button
+                      onClick={handleClearAllSessions}
+                      className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> مسح السجل
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1231,6 +1634,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <th className="py-3 px-4">وقت بدء العمل</th>
                       <th className="py-3 px-4">وقت الانتهاء</th>
                       <th className="py-3 px-4">الحالة</th>
+                      <th className="py-3 px-4 text-center">إجراءات</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1238,7 +1642,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       cs.staffName.includes(shiftSearch) || cs.counterName.includes(shiftSearch)
                     ).length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-400">
+                        <td colSpan={6} className="py-8 text-center text-slate-400">
                           لا توجد سجلات مناوبات مسجلة بعد
                         </td>
                       </tr>
@@ -1262,11 +1666,177 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               {!cs.endedAt ? 'نشط حالياً' : 'مكتملة'}
                             </span>
                           </td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => handleDeleteSession(cs.id)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors"
+                              title="حذف هذا السجل"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB: CATEGORIES & SERVICES MANAGEMENT */}
+          {dataSubTab === 'categories' && (
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">إدارة وتصنيف فئات الخدمات والمعاملات</h3>
+                  <p className="text-xs text-slate-500">إضافة فئات جديدة، تخصيص بادئة الترقيم (Prefix)، وتعديل أو حذف أي خدمة بالمنصة</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingCategory(null);
+                    setCategoryFormId('');
+                    setCategoryFormName('');
+                    setCategoryFormPrefix('');
+                    setCategoryFormDesc('');
+                    setShowCategoryModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <Plus className="w-4 h-4" /> إضافة فئة خدمة جديدة
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(settings?.categories || []).map(cat => {
+                  const catTicketsCount = tickets.filter(t => t.category === cat.id).length;
+                  return (
+                    <div key={cat.id} className="p-5 rounded-2xl border-2 border-slate-200 bg-slate-50 hover:border-amber-400 transition-all flex flex-col justify-between space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="w-9 h-9 rounded-xl bg-amber-600 text-white font-black font-mono text-base flex items-center justify-center shadow-sm">
+                            {cat.prefix}
+                          </span>
+                          <span className="text-[11px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-mono">
+                            {cat.id}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-sm">{cat.name}</h4>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{cat.desc || 'لا يوجد وصف محدد'}</p>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-xs flex items-center justify-between font-medium">
+                          <span className="text-slate-500">تذاكر اليوم المصدرة:</span>
+                          <strong className="text-amber-700 font-mono font-bold">{catTicketsCount} تذكرة</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                        <button
+                          onClick={() => {
+                            setEditingCategory(cat);
+                            setCategoryFormId(cat.id);
+                            setCategoryFormName(cat.name);
+                            setCategoryFormPrefix(cat.prefix);
+                            setCategoryFormDesc(cat.desc || '');
+                            setShowCategoryModal(true);
+                          }}
+                          className="flex-1 py-2 bg-slate-200 hover:bg-amber-100 hover:text-amber-900 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> تعديل وحفظ
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat)}
+                          className="p-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-xl transition-colors"
+                          title="حذف الفئة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB: RAW DATABASE & DIRECT EDITOR */}
+          {dataSubTab === 'database' && (
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Database className="w-5 h-5 text-amber-600" />
+                    إدارة بيانات المنصة والتعديل المباشر (Raw JSON)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    رؤية وتعديل أي حقل أو سجل في قاعدة البيانات مباشرة، التصدير والاستيراد، أو إعادة ضبط المصنع
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenRawDb}
+                  disabled={rawDbLoading}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+                >
+                  <Edit3 className="w-4 h-4 text-amber-400" />
+                  {rawDbLoading ? 'جارِ التحميل...' : 'فتح محرر قاعدة البيانات الخام (JSON Editor)'}
+                </button>
+              </div>
+
+              {/* Data Summary Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                  <div className="text-[11px] text-slate-500 font-bold">تذاكر اليوم</div>
+                  <div className="text-2xl font-black font-mono text-slate-900 mt-1">{tickets.length}</div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                  <div className="text-[11px] text-slate-500 font-bold">الشبابيك</div>
+                  <div className="text-2xl font-black font-mono text-slate-900 mt-1">{counters.length}</div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                  <div className="text-[11px] text-slate-500 font-bold">الموظفون والمندوبون</div>
+                  <div className="text-2xl font-black font-mono text-slate-900 mt-1">{staffList.length}</div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                  <div className="text-[11px] text-slate-500 font-bold">فئات الخدمات</div>
+                  <div className="text-2xl font-black font-mono text-slate-900 mt-1">{settings?.categories?.length || 0}</div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                  <div className="text-[11px] text-slate-500 font-bold">حركات التدقيق والرقابة</div>
+                  <div className="text-2xl font-black font-mono text-slate-900 mt-1">{auditLogs.length}</div>
+                </div>
+              </div>
+
+              {/* Database Actions */}
+              <div className="p-5 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-4">
+                <h4 className="text-xs font-bold text-amber-900">إجراءات الصيانة وقواعد البيانات:</h4>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleBackup}
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Download className="w-4 h-4 text-amber-400" /> تحميل نسخة احتياطية (JSON)
+                  </button>
+
+                  <label className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                    <Upload className="w-4 h-4" /> استعادة قاعدة البيانات من ملف
+                    <input type="file" accept=".json" onChange={handleRestoreFile} className="hidden" />
+                  </label>
+
+                  <button
+                    onClick={handleClearLogs}
+                    className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Trash2 className="w-4 h-4 text-slate-500" /> مسح سجل التدقيق السابق
+                  </button>
+
+                  <button
+                    onClick={handleResetDatabase}
+                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <RotateCcw className="w-4 h-4" /> إعادة ضبط المصنع الشامل
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1487,15 +2057,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <h3 className="text-base font-bold text-slate-800">سجل التدقيق والعمليات الدائم</h3>
               <p className="text-xs text-slate-500">سجل محمي ومؤرشف لجميع الأنشطة الإدارية وحركات التذاكر لمنع التلاعب وتوفير الشفافية الكاملة</p>
             </div>
-            <div className="relative w-full sm:w-72">
-              <input
-                type="text"
-                value={logSearch}
-                onChange={e => setLogSearch(e.target.value)}
-                placeholder="بحث في سجل العمليات..."
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-amber-500 pr-9"
-              />
-              <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-72">
+                <input
+                  type="text"
+                  value={logSearch}
+                  onChange={e => setLogSearch(e.target.value)}
+                  placeholder="بحث في سجل العمليات..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-amber-500 pr-9"
+                />
+                <Search className="absolute right-3 top-2.5 w-4 h-4 text-slate-400" />
+              </div>
+              {auditLogs.length > 0 && (
+                <button
+                  onClick={handleClearLogs}
+                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> تفريغ السجل
+                </button>
+              )}
             </div>
           </div>
 
@@ -1591,6 +2171,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">إسناد للموظف / المندوب:</label>
+                <select
+                  value={ticketFormStaff}
+                  onChange={e => setTicketFormStaff(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs"
+                >
+                  <option value="">-- بدون موظف محدد --</option>
+                  {adminStaffList.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.jobTitle || 'موظف'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">ملاحظات إدارية:</label>
                 <input
                   type="text"
@@ -1611,6 +2205,124 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingTicket(null)}
+                  className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: ADD MANUAL TICKET                                 */}
+      {/* ======================================================== */}
+      {showAddTicketModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">إضافة تذكرة دور جديدة يدوياً</h3>
+                <p className="text-[11px] text-slate-500">إصدار تذكرة فورية لمراجع أو محامٍ مع إمكانية توجيهها لشباك محدد</p>
+              </div>
+              <button onClick={() => setShowAddTicketModal(false)} className="p-1 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTicket} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">فئة ونوع المعاملة:</label>
+                <select
+                  value={ticketFormCategory}
+                  onChange={e => setTicketFormCategory(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold"
+                  required
+                >
+                  {(settings?.categories || []).map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      [{cat.prefix}] {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">رقم التذكرة المخصص (اختياري، اتركه فارغاً للترقيم التلقائي):</label>
+                <input
+                  type="text"
+                  value={ticketFormNumber}
+                  onChange={e => setTicketFormNumber(e.target.value)}
+                  placeholder="مثال: A-050 أو اتركه فارغاً ليأخذ الرقم التالي تلقائياً"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">حالة التذكرة الأولية:</label>
+                <select
+                  value={ticketFormStatus}
+                  onChange={e => setTicketFormStatus(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs"
+                >
+                  <option value="waiting">قيد الانتظار في الصالة (waiting)</option>
+                  <option value="serving">قيد الخدمة فوراً على الشباك (serving)</option>
+                  <option value="completed">مكتملة ومؤرشفة مسبقاً (completed)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">إسناد إلى شباك (اختياري):</label>
+                  <select
+                    value={ticketFormCounter}
+                    onChange={e => setTicketFormCounter(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                  >
+                    <option value="">-- بدون شباك --</option>
+                    {counters.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">إسناد لموظف (اختياري):</label>
+                  <select
+                    value={ticketFormStaff}
+                    onChange={e => setTicketFormStaff(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                  >
+                    <option value="">-- بدون موظف --</option>
+                    {adminStaffList.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">ملاحظات أو سبب الإصدار اليدوي:</label>
+                <input
+                  type="text"
+                  value={ticketFormNotes}
+                  onChange={e => setTicketFormNotes(e.target.value)}
+                  placeholder="مثال: حالة استثنائية، مراجع مسن، تصديق عاجل..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> إصدار وحفظ التذكرة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddTicketModal(false)}
                   className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs"
                 >
                   إلغاء
@@ -1741,51 +2453,159 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingStaff ? 'تعديل بيانات الموظف والصلاحيات' : 'إضافة موظف / مندوب جديد'}
-              </h3>
-              <button onClick={() => setShowAddStaffModal(false)} className="p-1 hover:bg-slate-100 rounded-lg">
-                <X className="w-5 h-5 text-slate-500" />
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {editingStaff ? 'تعديل بيانات الموظف أو مندوب الوكالات' : 'إضافة موظف / مندوب وكالات جديد'}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  يتم حفظ التغييرات فوراً في قاعدة البيانات وتحديث النظام المحلي
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowAddStaffModal(false);
+                  setEditingStaff(null);
+                }} 
+                className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-lg"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveStaff} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">اسم الموظف الكامل:</label>
+                <label className="text-xs font-bold text-slate-700">الاسم الكامل (للموظف أو المندوب):</label>
                 <input
                   type="text"
                   value={staffFormName}
                   onChange={e => setStaffFormName(e.target.value)}
                   placeholder="مثال: يوسف الحلبي"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">رمز الدخول الشخصي (PIN):</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={staffFormPin}
-                  onChange={e => setStaffFormPin(e.target.value)}
-                  placeholder="مثال: 4567"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-center tracking-widest"
-                  required
-                />
+                <label className="text-xs font-bold text-slate-700">الصفة / المسمى الوظيفي:</label>
+                <div className="flex gap-2">
+                  <select
+                    value={['مندوب وكالات', 'موظف توثيق', 'موظف شباك', 'أمين صندوق', 'مشرف قسم'].includes(staffFormJobTitle) ? staffFormJobTitle : 'other'}
+                    onChange={e => {
+                      if (e.target.value !== 'other') {
+                        setStaffFormJobTitle(e.target.value);
+                      } else {
+                        setStaffFormJobTitle('');
+                      }
+                    }}
+                    className="w-1/2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    <option value="مندوب وكالات">مندوب وكالات</option>
+                    <option value="موظف توثيق">موظف توثيق</option>
+                    <option value="موظف شباك">موظف شباك</option>
+                    <option value="أمين صندوق">أمين صندوق</option>
+                    <option value="مشرف قسم">مشرف قسم</option>
+                    <option value="other">مسمى مخصص...</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={staffFormJobTitle}
+                    onChange={e => setStaffFormJobTitle(e.target.value)}
+                    placeholder="اكتب المسمى الوظيفي..."
+                    className="w-1/2 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">رمز الدخول الشخصي (PIN):</label>
+                  {editingStaff && (
+                    <span className="text-[10px] text-amber-700 font-medium">
+                      اتركه فارغاً للاحتفاظ بالرمز القديم
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPinInput ? 'text' : 'password'}
+                    maxLength={8}
+                    value={staffFormPin}
+                    onChange={e => setStaffFormPin(e.target.value)}
+                    placeholder={editingStaff ? 'أدخل رمزاً جديداً لتغييره أو اتركه فارغاً' : 'مثال: 4567'}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-center tracking-widest focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    required={!editingStaff}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPinInput(!showPinInput)}
+                    className="absolute left-3 top-2.5 text-slate-400 hover:text-slate-700"
+                  >
+                    {showPinInput ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">نوع الصلاحية في النظام:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer ${
+                    staffFormRole === 'staff' ? 'bg-amber-50 border-amber-500 text-amber-900 font-bold' : 'border-slate-200 text-slate-700'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="staffRole"
+                      checked={staffFormRole === 'staff'}
+                      onChange={() => setStaffFormRole('staff')}
+                      className="accent-amber-600"
+                    />
+                    <span>مندوب / موظف عادي</span>
+                  </label>
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer ${
+                    staffFormRole === 'admin' ? 'bg-red-50 border-red-500 text-red-900 font-bold' : 'border-slate-200 text-slate-700'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="staffRole"
+                      checked={staffFormRole === 'admin'}
+                      onChange={() => setStaffFormRole('admin')}
+                      className="accent-red-600"
+                    />
+                    <span>مسؤول إداري</span>
+                  </label>
+                </div>
               </div>
 
               {/* Allowed Counters Selection */}
               <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
-                <div className="text-xs font-bold text-slate-800">الشبابيك المسموح للمندوب باختيارها:</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-800">الشبابيك المسموح للمندوب باختيارها:</div>
+                  <div className="flex gap-2 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setStaffFormAllowedCounters(counters.map(c => c.id))}
+                      className="text-amber-700 hover:underline"
+                    >
+                      تحديد الكل
+                    </button>
+                    <span>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setStaffFormAllowedCounters([])}
+                      className="text-slate-500 hover:underline"
+                    >
+                      متاح للكل
+                    </button>
+                  </div>
+                </div>
                 <div className="text-[11px] text-slate-500 pb-1">
                   إذا لم يتم تحديد أي شباك، سيكون مسموحاً له بالعمل على جميع الشبابيك.
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
                   {counters.map(counter => {
                     const isChecked = staffFormAllowedCounters.includes(counter.id);
                     return (
-                      <label key={counter.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                      <label key={counter.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer p-1 hover:bg-slate-100 rounded-lg">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -1806,31 +2626,206 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-xs font-bold text-slate-700">تفعيل الحساب (يسمح له بتسجيل الدخول):</span>
+                <div>
+                  <span className="text-xs font-bold text-slate-700 block">حالة الحساب:</span>
+                  <span className="text-[10px] text-slate-500">تفعيل أو تعطيل إمكانية تسجيل الدخول عبر البوابة</span>
+                </div>
                 <input
                   type="checkbox"
                   checked={staffFormActive}
                   onChange={e => setStaffFormActive(e.target.checked)}
-                  className="w-5 h-5 accent-amber-600 rounded"
+                  className="w-5 h-5 accent-amber-600 rounded cursor-pointer"
                 />
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md"
+                  disabled={savingStaffLoading}
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-2"
                 >
-                  حفظ بيانات الموظف
+                  <CheckCircle className="w-4 h-4" />
+                  {savingStaffLoading ? 'جارٍ الحفظ...' : (editingStaff ? 'حفظ تعديلات الموظف' : 'حفظ وإضافة الموظف')}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddStaffModal(false)}
+                  onClick={() => {
+                    setShowAddStaffModal(false);
+                    setEditingStaff(null);
+                  }}
                   className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs"
                 >
                   إلغاء
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: ADD / EDIT CATEGORY SERVICE                       */}
+      {/* ======================================================== */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {editingCategory ? 'تعديل وحفظ فئة الخدمة' : 'إضافة فئة خدمة / معاملة جديدة'}
+                </h3>
+                <p className="text-[11px] text-slate-500">تظهر هذه الفئة تلقائياً في شاشة إصدار التذاكر (Kiosk) والشاشة الرئيسية</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowCategoryModal(false);
+                  setEditingCategory(null);
+                }} 
+                className="p-1 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCategory} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">اسم فئة المعاملة:</label>
+                <input
+                  type="text"
+                  value={categoryFormName}
+                  onChange={e => setCategoryFormName(e.target.value)}
+                  placeholder="مثال: وكالات تجارية وشركات"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">حرف البادئة (Prefix):</label>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={categoryFormPrefix}
+                    onChange={e => setCategoryFormPrefix(e.target.value.toUpperCase())}
+                    placeholder="مثال: E أو C"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-center"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 block text-right">يظهر قبل رقم الدور (مثال: E-001)</span>
+                </div>
+
+                {!editingCategory && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">رمز المعرف (ID):</label>
+                    <input
+                      type="text"
+                      value={categoryFormId}
+                      onChange={e => setCategoryFormId(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+                      placeholder="اختياري (مثال: commercial)"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">وصف وتعليمات الخدمة:</label>
+                <textarea
+                  rows={2}
+                  value={categoryFormDesc}
+                  onChange={e => setCategoryFormDesc(e.target.value)}
+                  placeholder="وصف موجز يظهر للمراجعين عند اختيار هذه الفئة..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {editingCategory ? 'حفظ تعديلات الفئة' : 'إضافة وحفظ الفئة'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCategoryModal(false);
+                    setEditingCategory(null);
+                  }}
+                  className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: RAW DATABASE JSON DIRECT EDITOR                   */}
+      {/* ======================================================== */}
+      {showRawDbModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] flex flex-col text-right">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Database className="w-5 h-5 text-amber-400" />
+                  محرر قاعدة البيانات المباشر (Direct JSON Editor)
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  يمكنك تعديل أي بيانات بالمنصة مباشرة وحفظها فوراً في ملف قاعدة البيانات مع تحديث الخادم اللحظي
+                </p>
+              </div>
+              <button onClick={() => setShowRawDbModal(false)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-[350px] flex flex-col space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                <span>محتوى قاعدة البيانات بتنسيق JSON:</span>
+                <button
+                  onClick={() => {
+                    try {
+                      const formatted = JSON.stringify(JSON.parse(rawDbContent), null, 2);
+                      setRawDbContent(formatted);
+                    } catch (e: any) {
+                      showToast('error', 'صيغة JSON غير صحيحة لا يمكن تنسيقها');
+                    }
+                  }}
+                  className="text-amber-400 hover:underline flex items-center gap-1 font-mono text-[11px]"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> إعادة تنسيق وترتيب الكود (Format JSON)
+                </button>
+              </div>
+
+              <textarea
+                value={rawDbContent}
+                onChange={e => setRawDbContent(e.target.value)}
+                dir="ltr"
+                className="w-full flex-1 min-h-[350px] max-h-[50vh] bg-slate-950 text-emerald-400 font-mono text-xs p-4 rounded-2xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed overflow-auto"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2 border-t border-slate-800">
+              <button
+                onClick={handleSaveRawDb}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <CheckCircle className="w-4 h-4" /> حفظ التغييرات وتطبيقها على المنصة فوراً
+              </button>
+              <button
+                onClick={() => setShowRawDbModal(false)}
+                className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all"
+              >
+                إلغاء وإغلاق
+              </button>
+            </div>
           </div>
         </div>
       )}
