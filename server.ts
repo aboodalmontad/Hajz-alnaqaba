@@ -38,7 +38,7 @@ try {
 }
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-let DATA_DIR = join(__dirname, 'data');
+let DATA_DIR = process.env.VERCEL ? join(os.tmpdir(), 'queue_data') : join(__dirname, 'data');
 let DB_FILE = join(DATA_DIR, 'queue_db.json');
 
 // Ensure data directory exists, with fallback to os.tmpdir() if read-only (e.g. Vercel serverless)
