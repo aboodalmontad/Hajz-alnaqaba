@@ -12,6 +12,7 @@ import fs from 'fs';
 import os from 'os';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -289,6 +290,14 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
   next();
 }
+
+// Normalize trailing slashes for all /api requests to prevent 404s
+app.use('/api', (req, res, next) => {
+  if (req.path.length > 1 && req.path.endsWith('/')) {
+    req.url = req.url.replace(/\/+$/, '');
+  }
+  next();
+});
 
 // ==========================================
 // PUBLIC & CLIENT API ROUTES
@@ -1398,6 +1407,14 @@ io.on('connection', (socket) => {
 
 async function startServer() {
   const DIST_DIR = join(__dirname, 'dist');
+  if (!fs.existsSync(DIST_DIR)) {
+    try {
+      console.log('Building app distribution for production...');
+      execSync('npm run build', { stdio: 'inherit' });
+    } catch (e) {
+      console.error('Auto build warning:', e);
+    }
+  }
   const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(DIST_DIR);
   
   if (!isProduction) {
