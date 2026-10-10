@@ -385,8 +385,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Backup Download
-  const handleBackup = () => {
-    window.open(`/api/admin/backup?token=${adminToken}`, '_blank');
+  const handleBackup = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const res = await fetch('/api/admin/backup', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (!res.ok) throw new Error('فشل تحميل النسخة الاحتياطية');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_data_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast('success', 'تم تنزيل النسخة الاحتياطية بنجاح.');
+    } catch (err: any) {
+      showToast('error', err.message);
+    }
   };
 
   // Restore Database
