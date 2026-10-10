@@ -175,9 +175,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               <button
-                onClick={() => window.location.reload()}
+                onClick={handleTriggerReconnect}
                 className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all active:scale-95"
-                title="تحديث الصفحة ومسح الكاش"
+                title="تحديث البيانات"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
