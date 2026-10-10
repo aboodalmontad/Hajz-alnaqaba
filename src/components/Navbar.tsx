@@ -16,7 +16,8 @@ import {
   Copy,
   Check,
   ExternalLink,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
@@ -97,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 flex-wrap">
                   {departmentTitle || 'نقابة المحامين بحلب'}
                   <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">دائرة الوكالات</span>
-                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 5</span>
+                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 6</span>
                 </div>
                 <div className="text-xs text-slate-400">نظام إدارة الدور والانتظار (محلي لحظي عبر Wi-Fi)</div>
               </div>
@@ -171,6 +172,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <QrCode className="w-4 h-4" />
                 <span className="hidden md:inline">رمز الهاتف للمندوب</span>
                 <span className="md:hidden">كود الهاتف</span>
+              </button>
+
+              <button
+                onClick={() => window.location.reload()}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all active:scale-95"
+                title="تحديث الصفحة ومسح الكاش"
+              >
+                <RefreshCw className="w-4 h-4" />
               </button>
 
               <button
