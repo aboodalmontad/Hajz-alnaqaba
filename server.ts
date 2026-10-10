@@ -202,16 +202,7 @@ const defaultDb: DatabaseSchema = {
     { id: 'counter-4', name: 'الشباك 4 (تصديق العقود والاستعلامات)', isOpen: true, isPaused: false }
   ],
   counterSessions: [],
-  auditLogs: [
-    {
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      action: 'تهيئة النظام',
-      details: 'تم بدء تشغيل نظام إدارة الدور بنجاح',
-      user: 'النظام الآلي',
-      category: 'system'
-    }
-  ]
+  auditLogs: []
 };
 
 function ensureDataDir() {
