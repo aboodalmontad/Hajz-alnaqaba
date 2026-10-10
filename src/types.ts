@@ -12,6 +12,7 @@ export interface Ticket {
   status: 'waiting' | 'serving' | 'completed' | 'skipped' | 'cancelled';
   createdAt: string;
   calledAt?: string;
+  recallCount?: number;
   documentingStartedAt?: string;
   completedAt?: string;
   counterId?: string;

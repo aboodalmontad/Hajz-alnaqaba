@@ -840,6 +840,42 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                 )}
               </div>
 
+              {/* Recall Counter Status Badges */}
+              <div className="pt-2 flex flex-col items-center gap-2">
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <span className={`text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1.5 border shadow-sm ${
+                    (myServingTicket.recallCount || 0) >= 3
+                      ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
+                      : (myServingTicket.recallCount || 0) > 0
+                        ? 'bg-amber-600 text-white border-amber-700'
+                        : 'bg-slate-800 text-slate-200 border-slate-700'
+                  }`}>
+                    <PhoneCall className="w-3.5 h-3.5" />
+                    <span>
+                      {(myServingTicket.recallCount || 0) === 0
+                        ? 'النداء الأولي (0/3 إعادة نداء)'
+                        : `مرات إعادة النداء: ${myServingTicket.recallCount} من 3`}
+                    </span>
+                  </span>
+
+                  {(myServingTicket.recallCount || 0) >= 3 ? (
+                    <span className="bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full border border-rose-300">
+                      جاهز للتجاوز لعدم الحضور
+                    </span>
+                  ) : (
+                    <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-300">
+                      متبقي {3 - (myServingTicket.recallCount || 0)} نداءات
+                    </span>
+                  )}
+                </div>
+
+                {(myServingTicket.recallCount || 0) >= 3 && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-bold max-w-md">
+                    ⚠️ لم يحضر المراجع بعد 3 نداءات. اضغط على الزر الأحمر بالأسفل لتجاوز الدور واستدعاء التالي.
+                  </div>
+                )}
+              </div>
+
               <div className="text-xs text-amber-800 font-mono pt-1">
                 وقت الاستدعاء: {new Date(myServingTicket.calledAt || '').toLocaleTimeString('ar-SY')}
               </div>
@@ -878,32 +914,67 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
               {/* Start Documenting Button */}
               {/* Removed by user request */}
 
-              {/* Recall Button */}
-              <button
-                onClick={handleRecall}
-                className="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-sm"
-              >
-                <PhoneCall className="w-4 h-4" />
-                إعادة النداء على الشاشة
-              </button>
+              {/* Recall Button (Max 3 Times) */}
+              {myServingTicket.recallCount && myServingTicket.recallCount >= 3 ? (
+                <button
+                  type="button"
+                  disabled
+                  className="py-3.5 bg-slate-100 text-slate-400 font-bold rounded-2xl border border-slate-300 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-not-allowed"
+                  title="تم استنفاد الحد الأقصى لإعادة النداء (3 مرات)"
+                >
+                  <PhoneCall className="w-4 h-4 text-slate-400" />
+                  <span>تم استنفاد النداءات (3/3)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRecall}
+                  disabled={actionLoading}
+                  className="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
+                >
+                  <PhoneCall className="w-4 h-4" />
+                  <span>إعادة النداء ({(myServingTicket.recallCount || 0) + 1} من 3)</span>
+                </button>
+              )}
 
               {/* Complete Service Button */}
               <button
+                type="button"
                 onClick={handleComplete}
-                className="py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-sm"
+                disabled={actionLoading}
+                className="py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
               >
                 <CheckCircle className="w-4 h-4" />
-                إنهاء الخدمة وتوثيق المعاملة
+                <span>إنهاء الخدمة وتوثيق المعاملة</span>
               </button>
 
-              {/* Skip Ticket Button */}
-              <button
-                onClick={() => setSkipModal(true)}
-                className="sm:col-span-2 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-xs"
-              >
-                <SkipForward className="w-4 h-4" />
-                تجاوز الدور (عدم حضور المراجع عند النداء)
-              </button>
+              {/* Skip Ticket Button - Highlighted prominently when 3 recalls reached */}
+              {(myServingTicket.recallCount || 0) >= 3 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkipNotes('لم يحضر المراجع بعد استدعائه و3 نداءات متتالية على الشباك');
+                    setSkipModal(true);
+                  }}
+                  className="sm:col-span-2 py-4 bg-gradient-to-r from-rose-600 via-amber-600 to-rose-700 hover:from-rose-500 hover:to-amber-500 text-white font-black rounded-2xl shadow-xl border-2 border-rose-400 flex items-center justify-center gap-2.5 text-sm animate-pulse active:scale-98 cursor-pointer"
+                >
+                  <SkipForward className="w-5 h-5 text-white animate-bounce" />
+                  <span>تجاوز الدور الآن لعدم الحضور (تم النداء 3 مرات)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = myServingTicket.recallCount || 0;
+                    setSkipNotes(c > 0 ? `لم يحضر المراجع بعد ${c} نداءات` : 'لم يحضر المراجع عند النداء');
+                    setSkipModal(true);
+                  }}
+                  className="sm:col-span-2 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-xs active:scale-95 cursor-pointer"
+                >
+                  <SkipForward className="w-4 h-4 text-slate-300" />
+                  <span>تجاوز الدور لعدم الحضور (النداء {myServingTicket.recallCount || 0}/3)</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -927,27 +998,56 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
 
       {/* MODAL: SKIP TICKET WITH NOTES */}
       {skipModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900">تجاوز دور المراجع لعدم الحضور</h3>
-            <p className="text-xs text-slate-500">يرجى تسجيل سبب التجاوز (اختياري):</p>
-            <input
-              type="text"
-              value={skipNotes}
-              onChange={e => setSkipNotes(e.target.value)}
-              placeholder="مثال: لم يحضر المراجع بعد 3 نداءات"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-amber-500"
-            />
-            <div className="flex gap-3 pt-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <SkipForward className="w-5 h-5 text-rose-600" />
+                <span>تجاوز دور المراجع لعدم الحضور</span>
+              </h3>
+              <span className="font-mono font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-xl text-sm border border-amber-200">
+                {myServingTicket?.displayNumber}
+              </span>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1.5 text-slate-700">
+              <div className="flex items-center justify-between">
+                <span>مرات إعادة النداء المسجلة:</span>
+                <strong className={`font-mono ${
+                  (myServingTicket?.recallCount || 0) >= 3 ? 'text-rose-600' : 'text-amber-600'
+                }`}>
+                  {myServingTicket?.recallCount || 0} من 3
+                </strong>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {(myServingTicket?.recallCount || 0) >= 3
+                  ? 'تم استيفاء كامل النداءات الثلاثة القانونية ويحق للمندوب نظاماً تجاوز الدور واستدعاء التالي.'
+                  : 'يمكنك كتابة سبب التجاوز وتأكيده الآن.'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">سبب التجاوز المسجل في السجل:</label>
+              <input
+                type="text"
+                value={skipNotes}
+                onChange={e => setSkipNotes(e.target.value)}
+                placeholder="سبب عدم الحضور..."
+                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-amber-500 font-medium"
+              />
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
               <button
                 onClick={handleSkipSubmit}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs shadow-md"
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
               >
-                تأكيد التجاوز
+                <Check className="w-4 h-4" />
+                <span>تأكيد تجاوز الدور لعدم الحضور</span>
               </button>
               <button
                 onClick={() => setSkipModal(false)}
-                className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs"
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 إلغاء
               </button>

@@ -163,7 +163,7 @@ export default function App() {
   const [serverAppUrl, setServerAppUrl] = useState<string>('');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [counterSessions, setCounterSessions] = useState<CounterSession[]>(() => initialCache?.counterSessions || []);
-  const [lastCalledTicket, setLastCalledTicket] = useState<{ ticket: Ticket; counter: string; isRecall?: boolean } | null>(null);
+  const [lastCalledTicket, setLastCalledTicket] = useState<{ ticket: Ticket; counter: string; isRecall?: boolean; recallCount?: number; timestamp?: string } | null>(null);
 
   // Sync with browser back/forward buttons
   useEffect(() => {
@@ -289,7 +289,10 @@ export default function App() {
       });
 
       socket.on('ticket_called', (callData) => {
-        setLastCalledTicket(callData);
+        setLastCalledTicket({
+          ...callData,
+          timestamp: callData.timestamp || new Date().toISOString()
+        });
       });
 
       socket.on('audit_log_added', (newLog: AuditLog) => {
@@ -367,17 +370,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-['Cairo',sans-serif] flex flex-col">
-      <Navbar
-        currentTab={currentTab}
-        setCurrentTab={handleNavigate}
-        connected={connected}
-        localIPs={localIPs}
-        port={port}
-        serverAppUrl={serverAppUrl}
-        waitingCount={waitingCount}
-        departmentTitle={settings.departmentTitle}
-        onReconnect={fetchState}
-      />
+      {/* إخفاء الهيدر العلوي تماماً في صفحة شاشة عرض الدور للصالات */}
+      {currentTab !== 'display' && (
+        <Navbar
+          currentTab={currentTab}
+          setCurrentTab={handleNavigate}
+          connected={connected}
+          localIPs={localIPs}
+          port={port}
+          serverAppUrl={serverAppUrl}
+          waitingCount={waitingCount}
+          departmentTitle={settings.departmentTitle}
+          onReconnect={fetchState}
+        />
+      )}
 
       <main className="flex-1">
         {currentTab === 'home' && (
@@ -409,6 +415,7 @@ export default function App() {
             counters={counters}
             settings={settings}
             lastCalledTicket={lastCalledTicket}
+            onNavigateHome={() => handleNavigate('home')}
           />
         )}
 

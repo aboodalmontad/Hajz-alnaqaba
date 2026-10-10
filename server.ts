@@ -78,6 +78,7 @@ interface Ticket {
   status: 'waiting' | 'serving' | 'completed' | 'skipped' | 'cancelled';
   createdAt: string;
   calledAt?: string;
+  recallCount?: number;
   documentingStartedAt?: string;
   completedAt?: string;
   counterId?: string;
@@ -951,7 +952,7 @@ app.post('/api/staff/call-next', (req, res) => {
   res.json(nextTicket);
 });
 
-// Staff action: Recall ticket
+// Staff action: Recall ticket (Max 3 recalls allowed)
 app.post('/api/staff/recall', (req, res) => {
   const { ticketId, staffId } = req.body;
   const ticket = db.tickets.find(t => t.id === ticketId);
@@ -959,21 +960,39 @@ app.post('/api/staff/recall', (req, res) => {
     return res.status(400).json({ error: 'التذكرة غير موجودة أو ليست قيد الخدمة.' });
   }
 
+  const currentRecalls = ticket.recallCount || 0;
+  if (currentRecalls >= 3) {
+    return res.status(400).json({ 
+      error: 'تم استنفاد الحد الأقصى لإعادة النداء (3 مرات). يمكنك الآن تجاوز الدور لعدم حضور المراجع.' 
+    });
+  }
+
+  ticket.recallCount = currentRecalls + 1;
+  saveDb(db);
+  broadcastState();
+
   io.emit('ticket_called', {
     ticket,
     counter: ticket.counterName || 'الشباك',
     isRecall: true,
+    recallCount: ticket.recallCount,
     timestamp: new Date().toISOString()
   });
 
   logAudit(
     'إعادة النداء',
-    `إعادة النداء للتذكرة ${ticket.displayNumber} على ${ticket.counterName}`,
+    `إعادة النداء (المرة ${ticket.recallCount} من 3) للتذكرة ${ticket.displayNumber} على ${ticket.counterName}`,
     ticket.staffName || 'موظف',
     'ticket'
   );
 
-  res.json({ success: true, ticket });
+  res.json({ 
+    success: true, 
+    ticket,
+    recallCount: ticket.recallCount,
+    remainingRecalls: 3 - ticket.recallCount,
+    maxReached: ticket.recallCount >= 3
+  });
 });
 
 // Staff action: Complete service
@@ -1005,11 +1024,12 @@ app.post('/api/staff/skip', (req, res) => {
   const { ticketId, notes } = req.body;
   const ticket = db.tickets.find(t => t.id === ticketId);
   if (!ticket || ticket.status !== 'serving') {
-    return res.status(400).json({ error: 'التذكرة غير موجودة.' });
+    return res.status(400).json({ error: 'التذكرة غير موجودة أو ليست قيد الخدمة.' });
   }
 
+  const recallInfo = ticket.recallCount ? ` (تمت إعادة النداء ${ticket.recallCount} مرات)` : '';
   ticket.status = 'skipped';
-  ticket.notes = notes || 'لم يحضر المراجع عند النداء';
+  ticket.notes = notes || `لم يحضر المراجع عند النداء${recallInfo}`;
 
   saveDb(db);
   broadcastState();
