@@ -17,10 +17,12 @@ import {
   Check,
   ExternalLink,
   X,
-  RefreshCw
+  RefreshCw,
+  RotateCcw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
+import { clearAppCache } from '../utils/cache';
 
 interface NavbarProps {
   currentTab: string;
@@ -68,6 +70,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const [clearingCache, setClearingCache] = useState(false);
+  const [cacheMsg, setCacheMsg] = useState(false);
+
   const handleTriggerReconnect = () => {
     setReconnecting(true);
     if (onReconnect) {
@@ -78,6 +83,24 @@ export const Navbar: React.FC<NavbarProps> = ({
       setReconnectMsg(true);
       setTimeout(() => setReconnectMsg(false), 3000);
     }, 1000);
+  };
+
+  const handleClearCache = async (hardReload: boolean = false) => {
+    setClearingCache(true);
+    try {
+      await clearAppCache({ hardReload });
+      if (onReconnect) {
+        onReconnect();
+      }
+      setCacheMsg(true);
+      setTimeout(() => setCacheMsg(false), 3000);
+    } catch {
+      if (onReconnect) onReconnect();
+    } finally {
+      if (!hardReload) {
+        setClearingCache(false);
+      }
+    }
   };
 
   return (
@@ -175,11 +198,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               <button
-                onClick={handleTriggerReconnect}
-                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all active:scale-95"
-                title="تحديث البيانات"
+                onClick={() => handleClearCache(false)}
+                disabled={clearingCache}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 rounded-xl border border-slate-700 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                title="تحديث ومسح الكاش فوراً"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className={`w-4 h-4 ${clearingCache ? 'animate-spin' : ''}`} />
+                <span className="hidden xl:inline text-[11px] font-bold">
+                  {clearingCache ? 'جارِ المسح...' : 'تحديث ومسح الكاش'}
+                </span>
               </button>
 
               <button
@@ -360,7 +387,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {reconnectMsg && (
+            <button
+              onClick={() => handleClearCache(true)}
+              disabled={clearingCache}
+              className="w-full py-2.5 bg-slate-950 hover:bg-slate-800 text-amber-300 hover:text-white border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ مسح الكاش...' : 'تحديث ومسح الكاش (إعادة تحميل نظيفة)'}</span>
+            </button>
+
+            {cacheMsg && (
+              <div className="text-center text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl animate-pulse">
+                ✓ تم مسح ذاكرة الكاش وتحديث البيانات بنجاح!
+              </div>
+            )}
+
+            {reconnectMsg && !cacheMsg && (
               <div className="text-center text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl animate-pulse">
                 ✓ تم إرسال طلب الاتصال وتحديث البيانات بنجاح!
               </div>

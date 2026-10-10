@@ -20,9 +20,15 @@ import {
   CheckCircle2,
   Info,
   Monitor,
-  RefreshCw
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  Sparkles,
+  Layers,
+  Database
 } from 'lucide-react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
+import { clearAppCache, ClearCacheResult } from '../utils/cache';
 
 interface NetworkGuideProps {
   localIPs: string[];
@@ -47,6 +53,9 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
   const [activeQrTarget, setActiveQrTarget] = useState<'agent' | 'display' | 'kiosk'>('agent');
   const [activating, setActivating] = useState(false);
   const [activateMsg, setActivateMsg] = useState<string | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [cacheResult, setCacheResult] = useState<ClearCacheResult | null>(null);
+  const [cacheMsg, setCacheMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Auto-connect and activate server as soon as the Home page is entered
   useEffect(() => {
@@ -73,6 +82,42 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
     } finally {
       setActivating(false);
       setTimeout(() => setActivateMsg(null), 3500);
+    }
+  };
+
+  const handleClearCache = async (hardReload: boolean = false) => {
+    setClearingCache(true);
+    setCacheMsg(null);
+    try {
+      const res = await clearAppCache({ hardReload });
+      setCacheResult(res);
+      if (onActivateServer) {
+        await onActivateServer();
+      }
+      if (hardReload) {
+        setCacheMsg({
+          text: '✓ تم مسح ذاكرة الكاش بنجاح! جاري إعادة تحميل الصفحة بنسخة جديدة تماماً...',
+          type: 'success'
+        });
+      } else {
+        setCacheMsg({
+          text: `✓ تم مسح الكاش وتحديث بيانات النظام بنجاح (${res.timestamp})`,
+          type: 'success'
+        });
+        setTimeout(() => setCacheMsg(null), 5000);
+      }
+    } catch (err: any) {
+      console.error('Error clearing cache:', err);
+      setCacheMsg({
+        text: 'حدث خطأ أثناء مسح الكاش، جاري محاولة تحديث البيانات مباشرة.',
+        type: 'error'
+      });
+      if (onActivateServer) await onActivateServer();
+      setTimeout(() => setCacheMsg(null), 5000);
+    } finally {
+      if (!hardReload) {
+        setClearingCache(false);
+      }
     }
   };
 
@@ -140,8 +185,8 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
           </p>
 
           {/* Real-time Server Connection Status & Activation Bar */}
-          <div className="bg-slate-950/80 border border-slate-700/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="bg-slate-950/80 border border-slate-700/80 rounded-2xl p-4 flex flex-col lg:flex-row items-center justify-between gap-3 shadow-inner">
+            <div className="flex items-center gap-3 w-full lg:w-auto">
               <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${connected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-pulse' : activating ? 'bg-amber-400 animate-spin' : 'bg-rose-500'}`} />
               <div className="text-right">
                 <div className="text-xs font-bold flex items-center gap-1.5">
@@ -159,17 +204,39 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={handleManualActivate}
-              disabled={activating}
-              className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${activating ? 'animate-spin' : ''}`} />
-              {activating ? 'جارِ التنشيط...' : 'تنشيط وفحص الاتصال بالسيرفر'}
-            </button>
+            {/* Action Buttons Zone: Refresh & Clear Cache + Check Connection */}
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+              <button
+                onClick={() => handleClearCache(false)}
+                disabled={clearingCache || activating}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 cursor-pointer border border-amber-400/40"
+                title="مسح ذاكرة التخزين المؤقت (الكاش) وتحديث بيانات النظام فوراً"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${clearingCache ? 'animate-spin' : ''}`} />
+                <span>{clearingCache ? 'جارِ مسح الكاش والتحديث...' : 'تحديث ومسح الكاش'}</span>
+              </button>
+
+              <button
+                onClick={handleManualActivate}
+                disabled={activating || clearingCache}
+                className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-700 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                title="فحص الاتصال بالسيرفر المحلي"
+              >
+                <Wifi className={`w-3.5 h-3.5 ${activating ? 'animate-pulse text-amber-400' : 'text-emerald-400'}`} />
+                <span className="hidden sm:inline">{activating ? 'جارِ الفحص...' : 'فحص السيرفر'}</span>
+              </button>
+            </div>
           </div>
 
-          {activateMsg && (
+          {/* Cache & Action Feedback Alerts */}
+          {cacheMsg && (
+            <div className={`text-xs font-bold p-3 rounded-xl border flex items-center justify-center gap-2 animate-fade-in ${cacheMsg.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'}`}>
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{cacheMsg.text}</span>
+            </div>
+          )}
+
+          {activateMsg && !cacheMsg && (
             <div className={`text-xs font-bold p-2.5 rounded-xl text-center border animate-fade-in ${activateMsg.startsWith('✓') ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
               {activateMsg}
             </div>
@@ -178,21 +245,32 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
           <div className="flex flex-wrap gap-2.5 pt-2">
             <button
               onClick={() => onNavigate('staff')}
-              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 text-xs sm:text-sm"
+              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
             >
               <Smartphone className="w-4 h-4" /> فتح واجهة المندوب على هذا الجهاز (/agent)
             </button>
             <button
               onClick={() => onNavigate('display')}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600"
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600 active:scale-95 cursor-pointer"
             >
               <Tv className="w-4 h-4" /> شاشة العرض
             </button>
             <button
               onClick={() => onNavigate('kiosk')}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600"
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600 active:scale-95 cursor-pointer"
             >
               <Server className="w-4 h-4" /> إصدار التذاكر
+            </button>
+
+            {/* Quick Hard Reload & Clean Cache Button */}
+            <button
+              onClick={() => handleClearCache(true)}
+              disabled={clearingCache}
+              className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-700 text-amber-300 hover:text-white font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs border border-amber-500/30 active:scale-95 cursor-pointer"
+              title="إعادة تحميل نظيفة مع مسح كامل لملفات الكاش في المتصفح"
+            >
+              <RotateCcw className={`w-4 h-4 text-amber-400 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>إعادة تحميل نظيفة (Hard Refresh)</span>
             </button>
           </div>
         </div>
@@ -401,7 +479,111 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
 
           </div>
         </div>
+      </div>
 
+      {/* DEDICATED CACHE & REFRESH CONTROL SECTION */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 relative overflow-hidden space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 text-amber-700 bg-amber-100 px-3 py-1 rounded-full text-xs font-bold">
+              <RotateCcw className="w-3.5 h-3.5" /> صيانة النظام وتحديث البيانات
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              تحديث ومسح ذاكرة التخزين المؤقت (Cache)
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              استخدم هذه الأداة لتنظيف ملفات المتصفح المؤقتة وإجبار التطبيق على تحميل أحدث نسخة من الخادم وتحديث حالة الأدوار والشبابيك فوراً
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${
+              connected ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              {connected ? 'الخادم نشط ومتزامن' : 'الخادم غير متصل'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Action 1: In-place Cache Clear & Data Refresh */}
+          <div className="bg-gradient-to-br from-amber-50/60 to-orange-50/40 rounded-2xl p-5 border border-amber-200/80 flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-sm">
+                  <RefreshCw className={`w-5 h-5 ${clearingCache ? 'animate-spin' : ''}`} />
+                </span>
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  لحظي دون إعادة تحميل
+                </span>
+              </div>
+              <h3 className="font-extrabold text-slate-900 text-base">
+                مسح الكاش وتحديث البيانات اللحظية
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                يمسح الذاكرة المؤقتة لطلبات الشبكة ويعيد جلب أحدث قائمة للتذاكر وحالات الموظفين والشبابيك فورياً دون مقاطعة استخدامك للصفحة.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleClearCache(false)}
+              disabled={clearingCache || activating}
+              className="w-full py-3 bg-amber-600 hover:bg-amber-500 active:scale-[0.98] text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ مسح الكاش والتحديث...' : 'مسح الكاش وتحديث البيانات الآن'}</span>
+            </button>
+          </div>
+
+          {/* Action 2: Full Hard Refresh & Clean Reload */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 border border-slate-700 flex flex-col justify-between space-y-4 shadow-md">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-bold shadow-sm">
+                  <RotateCcw className={`w-5 h-5 ${clearingCache ? 'animate-spin' : ''}`} />
+                </span>
+                <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-400/30">
+                  إعادة تحميل كاملة (Hard Reload)
+                </span>
+              </div>
+              <h3 className="font-extrabold text-white text-base">
+                تحديث شامل ومسح كامل للكاش
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                يمسح Cache Storage، يلغي برمجيات Service Workers القديمة، ثم يجبر المتصفح على تنزيل أحدث ملفات التطبيق من السيرفر كنسخة جديدة 100%.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleClearCache(true)}
+              disabled={clearingCache}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-[0.98] text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <RotateCcw className={`w-4 h-4 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ المسح والتحميل...' : 'تحديث ومسح الكاش (إعادة تحميل نظيفة)'}</span>
+            </button>
+          </div>
+
+        </div>
+
+        {/* Clear Cache Details Info Banner */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>متى يُنصح باستخدام مسح الكاش؟</strong> عند تعديل أسماء الشبابيك أو فئات المعاملات، أو إذا لاحظ أحد مندوبي الوكالات عدم تحديث رقمه على الشاشة.
+            </span>
+          </div>
+          {cacheResult && (
+            <div className="shrink-0 bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-xl text-[11px] border border-emerald-200 flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              تم مسح {cacheResult.cachesCleared} مستودع كاش بنجاح ({cacheResult.timestamp})
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Network Overview Cards */}

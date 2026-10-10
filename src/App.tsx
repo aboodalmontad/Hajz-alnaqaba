@@ -23,12 +23,87 @@ const defaultSettings: SystemSettings = {
   workingHoursEnd: '15:00',
   ticketSequence: 0,
   categories: [
-    { id: 'general', prefix: 'A', name: 'وكالات عامة', desc: 'تنظيم الوكالات العامة وسحب النسخ المعتمدة' },
-    { id: 'special', prefix: 'B', name: 'وكالات خاصة', desc: 'وكالات البيع، الفراغ، الإدارة، والتصرف' },
-    { id: 'attestation', prefix: 'C', name: 'تصديق العقود', desc: 'تصديق وتثبيت العقود والاتفاقيات القانونية' },
-    { id: 'inquiry', prefix: 'D', name: 'الاستعلامات والدعم', desc: 'الاستعلام عن الأوراق المطلوبة والرسوم النقابية' }
+    {
+      id: 'special',
+      prefix: 'A',
+      name: 'توثيق وكالة',
+      desc: 'تنجز هذه المعاملة أمام مندوب رئيس الفرع للتثبت من الهوية و محتويات الوكالة',
+      assignedCounterId: 'counter-1791640234085',
+      assignedCounterName: 'الشباك 1'
+    },
+    {
+      id: 'cat_1791641888137',
+      name: 'الحصول على صورة عن وكالة',
+      prefix: 'B',
+      desc: ''
+    },
+    {
+      id: 'cat_1791677992936',
+      name: 'عزل وكالة',
+      prefix: 'C',
+      desc: 'لعزل وكالة محامي يتطلب وجود صورة عن الوكالة أو رقمها ودفع رسم العزل وتبليغ المحامي المعزول والتأشير بوقوع العزل على الوكالة المعزولة .'
+    }
   ]
 };
+
+const defaultInitialStaff: Staff[] = [
+  {
+    id: 'staff-1791572701221',
+    name: 'حسان مرشحة',
+    pin: '123456',
+    counterId: '',
+    active: true,
+    role: 'staff',
+    jobTitle: 'مندوب وكالات',
+    allowedCounterIds: []
+  },
+  {
+    id: 'staff-1791572724537',
+    name: 'زكريا ننه',
+    pin: '123456',
+    counterId: '',
+    active: true,
+    role: 'staff',
+    jobTitle: 'مندوب وكالات',
+    allowedCounterIds: []
+  }
+];
+
+const defaultInitialCounters: Counter[] = [
+  { id: 'counter-1791640234085', name: 'الشباك 1', isOpen: true, isPaused: false },
+  { id: 'counter-1791640239853', name: 'الشباك 2', isOpen: true, isPaused: false, assignedServiceId: 'special', assignedServiceName: 'توثيق وكالة' },
+  { id: 'counter-1791640243217', name: 'الشباك 3', isOpen: true, isPaused: false, assignedServiceId: 'special', assignedServiceName: 'توثيق وكالة' },
+  { id: 'counter-1791640932058', name: 'الشباك 5', isOpen: true, isPaused: false, assignedServiceId: 'cat_1791677992936', assignedServiceName: 'عزل وكالة' },
+  { id: 'counter-1791642058000', name: 'الشباك 6', isOpen: true, isPaused: false, assignedServiceId: 'cat_1791641888137', assignedServiceName: 'الحصول على صورة عن وكالة' }
+];
+
+interface PersistedClientState {
+  settings?: SystemSettings;
+  staff?: Staff[];
+  counters?: Counter[];
+  tickets?: Ticket[];
+  date?: string;
+  counterSessions?: CounterSession[];
+  issuancePaused?: boolean;
+}
+
+function loadPersistedClientState(): PersistedClientState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('agency_persisted_state');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function savePersistedClientState(data: Partial<PersistedClientState>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const prev = loadPersistedClientState() || {};
+    const updated = { ...prev, ...data };
+    localStorage.setItem('agency_persisted_state', JSON.stringify(updated));
+  } catch {}
+}
 
 // URL Router resolver
 function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' {
@@ -62,24 +137,32 @@ function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' {
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'kiosk' | 'display' | 'staff' | 'admin'>(getInitialTab);
   const [connected, setConnected] = useState(false);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+
+  const initialCache = loadPersistedClientState();
+  const [tickets, setTickets] = useState<Ticket[]>(() => initialCache?.tickets || []);
   const [staffList, setStaffList] = useState<Staff[]>(() => {
+    if (initialCache?.staff && initialCache.staff.length > 0) return initialCache.staff;
     try {
       const b = localStorage.getItem('agency_staff_backup');
-      return b ? JSON.parse(b) : [];
-    } catch {
-      return [];
-    }
+      if (b) {
+        const parsed = JSON.parse(b);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return defaultInitialStaff;
   });
-  const [counters, setCounters] = useState<Counter[]>([]);
-  const [issuancePaused, setIssuancePaused] = useState(false);
-  const [date, setDate] = useState('');
-  const [settings, setSettings] = useState<SystemSettings>(defaultSettings);
+  const [counters, setCounters] = useState<Counter[]>(() => {
+    if (initialCache?.counters && initialCache.counters.length > 0) return initialCache.counters;
+    return defaultInitialCounters;
+  });
+  const [issuancePaused, setIssuancePaused] = useState<boolean>(() => initialCache?.issuancePaused || false);
+  const [date, setDate] = useState(() => initialCache?.date || '');
+  const [settings, setSettings] = useState<SystemSettings>(() => initialCache?.settings || defaultSettings);
   const [localIPs, setLocalIPs] = useState<string[]>(['127.0.0.1']);
   const [port, setPort] = useState<number>(3000);
   const [serverAppUrl, setServerAppUrl] = useState<string>('');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [counterSessions, setCounterSessions] = useState<CounterSession[]>([]);
+  const [counterSessions, setCounterSessions] = useState<CounterSession[]>(() => initialCache?.counterSessions || []);
   const [lastCalledTicket, setLastCalledTicket] = useState<{ ticket: Ticket; counter: string; isRecall?: boolean } | null>(null);
 
   // Sync with browser back/forward buttons
@@ -110,11 +193,11 @@ export default function App() {
       .then(data => {
         setConnected(true);
         if (data.tickets) setTickets(data.tickets);
-        if (data.staff) {
+        if (data.staff && data.staff.length > 0) {
           setStaffList(data.staff);
           try { localStorage.setItem('agency_staff_backup', JSON.stringify(data.staff)); } catch {}
         }
-        if (data.counters) setCounters(data.counters);
+        if (data.counters && data.counters.length > 0) setCounters(data.counters);
         if (data.counterSessions) setCounterSessions(data.counterSessions);
         if (typeof data.issuancePaused === 'boolean') setIssuancePaused(data.issuancePaused);
         if (data.date) setDate(data.date);
@@ -122,6 +205,16 @@ export default function App() {
         if (data.port) setPort(data.port);
         if (data.appUrl) setServerAppUrl(data.appUrl);
         if (data.settings) setSettings(data.settings);
+
+        savePersistedClientState({
+          tickets: data.tickets,
+          staff: data.staff,
+          counters: data.counters,
+          counterSessions: data.counterSessions,
+          issuancePaused: data.issuancePaused,
+          date: data.date,
+          settings: data.settings
+        });
         return true;
       })
       .catch(err => {
@@ -174,15 +267,25 @@ export default function App() {
 
       socket.on('state_update', (state) => {
         if (state.tickets) setTickets(state.tickets);
-        if (state.staff) {
+        if (state.staff && state.staff.length > 0) {
           setStaffList(state.staff);
           try { localStorage.setItem('agency_staff_backup', JSON.stringify(state.staff)); } catch {}
         }
-        if (state.counters) setCounters(state.counters);
+        if (state.counters && state.counters.length > 0) setCounters(state.counters);
         if (state.counterSessions) setCounterSessions(state.counterSessions);
         if (typeof state.issuancePaused === 'boolean') setIssuancePaused(state.issuancePaused);
         if (state.date) setDate(state.date);
         if (state.settings) setSettings(state.settings);
+
+        savePersistedClientState({
+          tickets: state.tickets,
+          staff: state.staff,
+          counters: state.counters,
+          counterSessions: state.counterSessions,
+          issuancePaused: state.issuancePaused,
+          date: state.date,
+          settings: state.settings
+        });
       });
 
       socket.on('ticket_called', (callData) => {

@@ -43,10 +43,26 @@ export const Kiosk: React.FC<KioskProps> = ({
   onRefreshState
 }) => {
   const defaultCategories: CategoryConfig[] = [
-    { id: 'general', name: 'توثيق وكالة', desc: 'تنظيم وتوثيق الوكالات العامة والخاصة وتثبيتها أصولاً', prefix: 'A' },
-    { id: 'copy', name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة', prefix: 'B' },
-    { id: 'special', name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع، الفراغ، الإدارة، والتصرف العقاري والمركبات', prefix: 'C' },
-    { id: 'attestation', name: 'تصديق العقود والاستعلامات', desc: 'تصديق وتثبيت العقود والاتفاقيات والاستعلام عن الرسوم النقابية', prefix: 'D' },
+    {
+      id: 'special',
+      prefix: 'A',
+      name: 'توثيق وكالة',
+      desc: 'تنجز هذه المعاملة أمام مندوب رئيس الفرع للتثبت من الهوية و محتويات الوكالة',
+      assignedCounterId: 'counter-1791640234085',
+      assignedCounterName: 'الشباك 1'
+    },
+    {
+      id: 'cat_1791641888137',
+      name: 'الحصول على صورة عن وكالة',
+      prefix: 'B',
+      desc: ''
+    },
+    {
+      id: 'cat_1791677992936',
+      name: 'عزل وكالة',
+      prefix: 'C',
+      desc: 'لعزل وكالة محامي يتطلب وجود صورة عن الوكالة أو رقمها ودفع رسم العزل وتبليغ المحامي المعزول والتأشير بوقوع العزل على الوكالة المعزولة .'
+    }
   ];
 
   const categories = customCategories && customCategories.length > 0 ? customCategories : defaultCategories;

@@ -187,10 +187,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Status message banner
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Sync settings when props change
+  // Sync settings when props change, ensuring categories are not emptied
   useEffect(() => {
     if (settings) {
-      setFormSettings(settings);
+      setFormSettings(prev => ({
+        ...settings,
+        categories: (settings.categories && settings.categories.length > 0)
+          ? settings.categories
+          : (prev?.categories && prev.categories.length > 0 ? prev.categories : settings.categories)
+      }));
     }
   }, [settings]);
 

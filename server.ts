@@ -25,6 +25,11 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-token, x-admin-pin');
+  if (req.path.startsWith('/api')) {
+    res.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.header('Pragma', 'no-cache');
+    res.header('Expires', '0');
+  }
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -49,26 +54,20 @@ try {
 }
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-let DATA_DIR = process.env.VERCEL ? join(os.tmpdir(), 'queue_data') : join(__dirname, 'data');
-let DB_FILE = join(DATA_DIR, 'queue_db.json');
+const PRIMARY_DATA_DIR = join(process.cwd(), 'data');
+const BACKUP_DATA_DIR = join(__dirname, 'data');
+const TMP_DATA_DIR = join(os.tmpdir(), 'queue_data');
 
-// Ensure data directory exists, with fallback to os.tmpdir() if read-only (e.g. Vercel serverless)
-try {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  fs.accessSync(DATA_DIR, fs.constants.W_OK);
-} catch (err) {
-  DATA_DIR = join(os.tmpdir(), 'queue_data');
-  DB_FILE = join(DATA_DIR, 'queue_db.json');
-  if (!fs.existsSync(DATA_DIR)) {
-    try {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    } catch (e) {
-      // Ignore
+[PRIMARY_DATA_DIR, BACKUP_DATA_DIR, TMP_DATA_DIR].forEach(dir => {
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
+  } catch (e) {
+    // Non-fatal
   }
-}
+});
+let DB_FILE = join(PRIMARY_DATA_DIR, 'queue_db.json');
 
 interface Ticket {
   id: string;
@@ -177,10 +176,26 @@ const defaultSettings: SystemSettings = {
   ticketSequence: 0,
   adminPin: '9999',
   categories: [
-    { id: 'general', prefix: 'A', name: 'توثيق وكالة', desc: 'تنظيم وتوثيق الوكالات العامة والخاصة وتثبيتها أصولاً' },
-    { id: 'special', prefix: 'B', name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة' },
-    { id: 'attestation', prefix: 'C', name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع، الفراغ، الإدارة، والتصرف العقاري والمركبات' },
-    { id: 'inquiry', prefix: 'D', name: 'تصديق العقود والاستعلامات', desc: 'تصديق وتثبيت العقود والاتفاقيات والاستعلام عن الرسوم النقابية' }
+    {
+      id: 'special',
+      prefix: 'A',
+      name: 'توثيق وكالة',
+      desc: 'تنجز هذه المعاملة أمام مندوب رئيس الفرع للتثبت من الهوية و محتويات الوكالة',
+      assignedCounterId: 'counter-1791640234085',
+      assignedCounterName: 'الشباك 1'
+    },
+    {
+      id: 'cat_1791641888137',
+      name: 'الحصول على صورة عن وكالة',
+      prefix: 'B',
+      desc: ''
+    },
+    {
+      id: 'cat_1791677992936',
+      name: 'عزل وكالة',
+      prefix: 'C',
+      desc: 'لعزل وكالة محامي يتطلب وجود صورة عن الوكالة أو رقمها ودفع رسم العزل وتبليغ المحامي المعزول والتأشير بوقوع العزل على الوكالة المعزولة .'
+    }
   ]
 };
 
@@ -191,87 +206,169 @@ const defaultDb: DatabaseSchema = {
   settings: defaultSettings,
   tickets: [],
   staff: [
-    { id: 'staff-1', name: 'أحمد المحمود', pin: '1234', counterId: '', active: true, role: 'staff', jobTitle: 'مندوب وكالات' },
-    { id: 'staff-2', name: 'فاطمة الخطيب', pin: '2345', counterId: '', active: true, role: 'staff', jobTitle: 'مندوب وكالات' },
-    { id: 'staff-3', name: 'محمد النجار', pin: '3456', counterId: '', active: true, role: 'staff', jobTitle: 'موظف توثيق' }
+    {
+      id: 'staff-1791572701221',
+      name: 'حسان مرشحة',
+      pin: '123456',
+      counterId: '',
+      active: true,
+      role: 'staff',
+      jobTitle: 'مندوب وكالات',
+      allowedCounterIds: []
+    },
+    {
+      id: 'staff-1791572724537',
+      name: 'زكريا ننه',
+      pin: '123456',
+      counterId: '',
+      active: true,
+      role: 'staff',
+      jobTitle: 'مندوب وكالات',
+      allowedCounterIds: []
+    }
   ],
   counters: [
-    { id: 'counter-1', name: 'الشباك 1 (توثيق وكالة)', isOpen: true, isPaused: false },
-    { id: 'counter-2', name: 'الشباك 2 (الحصول على صورة عن وكالة)', isOpen: true, isPaused: false },
-    { id: 'counter-3', name: 'الشباك 3 (تنظيم وكالة خاصة)', isOpen: true, isPaused: false },
-    { id: 'counter-4', name: 'الشباك 4 (تصديق العقود والاستعلامات)', isOpen: true, isPaused: false }
+    {
+      id: 'counter-1791640234085',
+      name: 'الشباك 1',
+      isOpen: true,
+      isPaused: false
+    },
+    {
+      id: 'counter-1791640239853',
+      name: 'الشباك 2',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'special',
+      assignedServiceName: 'توثيق وكالة'
+    },
+    {
+      id: 'counter-1791640243217',
+      name: 'الشباك 3',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'special',
+      assignedServiceName: 'توثيق وكالة'
+    },
+    {
+      id: 'counter-1791640932058',
+      name: 'الشباك 5',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'cat_1791677992936',
+      assignedServiceName: 'عزل وكالة'
+    },
+    {
+      id: 'counter-1791642058000',
+      name: 'الشباك 6',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'cat_1791641888137',
+      assignedServiceName: 'الحصول على صورة عن وكالة'
+    }
   ],
   counterSessions: [],
   auditLogs: []
 };
 
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (err) {
-    console.error('Error creating data directory:', err);
-  }
+function getCandidateDbPaths(): string[] {
+  const cwd = process.cwd();
+  return [
+    join(cwd, 'data', 'queue_db.json'),
+    join(cwd, 'data', 'queue_db.backup.json'),
+    join(cwd, 'data', 'queue_db.stable.json'),
+    join(__dirname, 'data', 'queue_db.json'),
+    join('/app/applet/data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_db.json')
+  ];
 }
 
 function loadDb(): DatabaseSchema {
-  ensureDataDir();
+  const candidatePaths = getCandidateDbPaths();
+  let bestData: DatabaseSchema | null = null;
+  let maxScore = -1;
 
-  let data: string | null = null;
-  const fallbackFile = join(os.tmpdir(), 'queue_db.json');
+  for (const filePath of candidatePaths) {
+    if (fs.existsSync(filePath)) {
+      try {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(raw) as DatabaseSchema;
+        if (parsed && typeof parsed === 'object') {
+          // Calculate score based on richness of preserved data
+          let score = 0;
+          if (Array.isArray(parsed.staff) && parsed.staff.length > 0) score += parsed.staff.length * 10;
+          if (Array.isArray(parsed.counters) && parsed.counters.length > 0) score += parsed.counters.length * 10;
+          if (parsed.settings?.categories && parsed.settings.categories.length > 0) score += parsed.settings.categories.length * 10;
+          if (Array.isArray(parsed.tickets)) score += parsed.tickets.length;
+          if (Array.isArray(parsed.auditLogs)) score += Math.min(parsed.auditLogs.length, 50);
 
-  if (fs.existsSync(DB_FILE)) {
-    data = fs.readFileSync(DB_FILE, 'utf8');
-  } else if (fs.existsSync(fallbackFile)) {
-    data = fs.readFileSync(fallbackFile, 'utf8');
-  }
-
-  if (data) {
-    try {
-      const loaded = JSON.parse(data) as DatabaseSchema;
-      // ... (migrations logic remains the same)
-      if (!loaded.settings) loaded.settings = { ...defaultSettings };
-      if (!loaded.settings.categories) loaded.settings.categories = defaultSettings.categories;
-      if (!loaded.settings.adminPin) loaded.settings.adminPin = '9999';
-      if (!loaded.settings.departmentTitle) loaded.settings.departmentTitle = defaultSettings.departmentTitle;
-      if (!loaded.settings.departmentSubtitle) loaded.settings.departmentSubtitle = defaultSettings.departmentSubtitle;
-      if (!loaded.settings.tickerMessage) loaded.settings.tickerMessage = defaultSettings.tickerMessage;
-      if (typeof loaded.settings.soundAlertsEnabled !== 'boolean') loaded.settings.soundAlertsEnabled = true;
-      if (!loaded.auditLogs) loaded.auditLogs = [];
-      if (!loaded.counterSessions) loaded.counterSessions = [];
-      if (!loaded.staff || !Array.isArray(loaded.staff) || loaded.staff.length === 0) {
-        loaded.staff = [...defaultDb.staff];
-      } else {
-        loaded.staff.forEach(s => { if (!s.jobTitle) s.jobTitle = 'مندوب وكالات'; });
+          if (score > maxScore) {
+            maxScore = score;
+            bestData = parsed;
+            DB_FILE = filePath;
+          }
+        }
+      } catch (e) {
+        console.warn(`Could not parse candidate DB file ${filePath}:`, e);
       }
-      loaded.counters = loaded.counters.map(c => ({ ...c, isPaused: typeof c.isPaused === 'boolean' ? c.isPaused : false }));
-      if (!loaded.activeTokens || !Array.isArray(loaded.activeTokens)) loaded.activeTokens = [];
-      
-      return loaded;
-    } catch (parseErr) {
-      console.error('CRITICAL: DB file exists but is corrupted, aborting to prevent data loss:', parseErr);
-      throw parseErr; // Stop the server if data is corrupted
     }
   }
 
-  // Fresh start
-  console.log('No DB file found, initializing with default settings.');
+  if (bestData) {
+    // Preserve user configuration completely without reverting to defaults
+    if (!bestData.settings) bestData.settings = { ...defaultSettings };
+    if (!bestData.settings.categories || bestData.settings.categories.length === 0) {
+      bestData.settings.categories = defaultSettings.categories;
+    }
+    if (!bestData.settings.adminPin) bestData.settings.adminPin = '9999';
+    if (!bestData.settings.departmentTitle) bestData.settings.departmentTitle = defaultSettings.departmentTitle;
+    if (!bestData.settings.departmentSubtitle) bestData.settings.departmentSubtitle = defaultSettings.departmentSubtitle;
+    if (!bestData.settings.tickerMessage) bestData.settings.tickerMessage = defaultSettings.tickerMessage;
+    if (typeof bestData.settings.soundAlertsEnabled !== 'boolean') bestData.settings.soundAlertsEnabled = true;
+    if (!Array.isArray(bestData.auditLogs)) bestData.auditLogs = [];
+    if (!Array.isArray(bestData.counterSessions)) bestData.counterSessions = [];
+    if (!Array.isArray(bestData.tickets)) bestData.tickets = [];
+    if (!Array.isArray(bestData.staff)) bestData.staff = defaultDb.staff;
+    if (!Array.isArray(bestData.counters)) bestData.counters = defaultDb.counters;
+
+    // Immediately mirror to all persistent locations to prevent future loss
+    saveDb(bestData);
+    return bestData;
+  }
+
+  // Fallback to initial structured default DB with verified user layout
+  console.log('No existing DB found across candidate paths, initializing with stable database.');
   saveDb(defaultDb);
   return defaultDb;
 }
 
 function saveDb(currentDb: DatabaseSchema) {
-  try {
-    ensureDataDir();
-    fs.writeFileSync(DB_FILE, JSON.stringify(currentDb, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error saving DB to primary location:', err);
+  const jsonContent = JSON.stringify(currentDb, null, 2);
+  const targets = [
+    join(process.cwd(), 'data', 'queue_db.json'),
+    join(process.cwd(), 'data', 'queue_db.backup.json'),
+    join(process.cwd(), 'data', 'queue_db.stable.json'),
+    join(__dirname, 'data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_db.json')
+  ];
+
+  for (const target of targets) {
     try {
-      const fallbackFile = join(os.tmpdir(), 'queue_db.json');
-      fs.writeFileSync(fallbackFile, JSON.stringify(currentDb, null, 2), 'utf8');
-    } catch (fallbackErr) {
-      console.error('Error saving DB to fallback location:', fallbackErr);
+      const dir = dirname(target);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const tmpPath = `${target}.tmp.${Date.now()}`;
+      fs.writeFileSync(tmpPath, jsonContent, 'utf8');
+      fs.renameSync(tmpPath, target);
+    } catch {
+      try {
+        fs.writeFileSync(target, jsonContent, 'utf8');
+      } catch {
+        // Continue to other targets
+      }
     }
   }
 }

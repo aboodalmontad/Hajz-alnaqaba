@@ -593,7 +593,8 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                     )}
                     {(() => {
                       const assignedCat = categories?.find(c => c.id === counter.assignedServiceId) || 
-                                         categories?.find(c => counter.assignedServiceName && c.name.includes(counter.assignedServiceName));
+                                         categories?.find(c => counter.assignedServiceId === c.id) ||
+                                         categories?.find(c => counter.assignedServiceName && (c.name === counter.assignedServiceName || c.name.includes(counter.assignedServiceName)));
                       return assignedCat?.desc ? (
                         <div className="text-[10px] text-slate-600 mt-1.5 leading-tight line-clamp-2 italic">
                           {assignedCat.desc}
