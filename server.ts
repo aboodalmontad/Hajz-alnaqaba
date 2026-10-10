@@ -225,20 +225,21 @@ function ensureDataDir() {
 }
 
 function loadDb(): DatabaseSchema {
-  try {
-    ensureDataDir();
-    let data: string | null = null;
-    if (fs.existsSync(DB_FILE)) {
-      data = fs.readFileSync(DB_FILE, 'utf8');
-    } else {
-      const fallbackFile = join(os.tmpdir(), 'queue_db.json');
-      if (fs.existsSync(fallbackFile)) {
-        data = fs.readFileSync(fallbackFile, 'utf8');
-      }
-    }
+  ensureDataDir();
 
-    if (data) {
+  let data: string | null = null;
+  const fallbackFile = join(os.tmpdir(), 'queue_db.json');
+
+  if (fs.existsSync(DB_FILE)) {
+    data = fs.readFileSync(DB_FILE, 'utf8');
+  } else if (fs.existsSync(fallbackFile)) {
+    data = fs.readFileSync(fallbackFile, 'utf8');
+  }
+
+  if (data) {
+    try {
       const loaded = JSON.parse(data) as DatabaseSchema;
+      // ... (migrations logic remains the same)
       if (!loaded.settings) loaded.settings = { ...defaultSettings };
       if (!loaded.settings.categories) loaded.settings.categories = defaultSettings.categories;
       if (!loaded.settings.adminPin) loaded.settings.adminPin = '9999';
@@ -251,24 +252,20 @@ function loadDb(): DatabaseSchema {
       if (!loaded.staff || !Array.isArray(loaded.staff) || loaded.staff.length === 0) {
         loaded.staff = [...defaultDb.staff];
       } else {
-        // Ensure jobTitle exists
-        loaded.staff.forEach(s => {
-          if (!s.jobTitle) s.jobTitle = 'مندوب وكالات';
-        });
+        loaded.staff.forEach(s => { if (!s.jobTitle) s.jobTitle = 'مندوب وكالات'; });
       }
-      // Clean up counters if missing fields
-      loaded.counters = loaded.counters.map(c => ({
-        ...c,
-        isPaused: typeof c.isPaused === 'boolean' ? c.isPaused : false
-      }));
-      if (!loaded.activeTokens || !Array.isArray(loaded.activeTokens)) {
-        loaded.activeTokens = [];
-      }
+      loaded.counters = loaded.counters.map(c => ({ ...c, isPaused: typeof c.isPaused === 'boolean' ? c.isPaused : false }));
+      if (!loaded.activeTokens || !Array.isArray(loaded.activeTokens)) loaded.activeTokens = [];
+      
       return loaded;
+    } catch (parseErr) {
+      console.error('CRITICAL: DB file exists but is corrupted, aborting to prevent data loss:', parseErr);
+      throw parseErr; // Stop the server if data is corrupted
     }
-  } catch (err) {
-    console.error('Error loading DB, using default:', err);
   }
+
+  // Fresh start
+  console.log('No DB file found, initializing with default settings.');
   saveDb(defaultDb);
   return defaultDb;
 }
