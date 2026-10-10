@@ -92,7 +92,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [authLoading, setAuthLoading] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs' | 'issuance_control'>('issuance_control');
+  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs'>('overview');
   const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts' | 'categories' | 'database'>('counters');
 
   const getNextServicePrefix = (categories: CategoryConfig[] = []) => {
@@ -1150,23 +1150,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Main Navigation Tabs */}
       <div className="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 flex gap-2 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('issuance_control')}
-          className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'issuance_control' 
-              ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/30' 
-              : 'text-slate-800 hover:bg-slate-100 bg-amber-50/70 border border-amber-200/70'
-          }`}
-        >
-          <Ticket className="w-4 h-4 text-amber-500" />
-          <span>لوحة التحكم الخاصة بإصدار الدور</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'issuance_control' ? 'bg-slate-900 text-white' : 'bg-amber-200 text-amber-900'
-          }`}>
-            {issuancePaused ? 'متوقف' : 'جاهز'}
-          </span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('data_management')}
           className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'data_management' 
@@ -1216,70 +1199,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
       {/* SUBTAB: ISSUANCE CONTROL (KIOSK) */}
-      {activeTab === 'issuance_control' && (
-        <div id="issuance-control-section" className="space-y-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                <Ticket className="w-5 h-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">لوحة التحكم الخاصة بإصدار تذاكر الدور</h3>
-                <p className="text-xs text-slate-500">
-                  لوحة تفاعلية متكاملة للمدير العام تتيح إصدار التذاكر فوراً ومتابعة مراجعي الدور وحالة النظام
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={handleToggleIssuance}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
-                  issuancePaused 
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                    : 'bg-slate-800 hover:bg-slate-700 text-white'
-                }`}
-              >
-                {issuancePaused ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
-                {issuancePaused ? 'استئناف إصدار التذاكر' : 'إيقاف إصدار التذاكر مؤقتاً'}
-              </button>
-              {onNavigate && (
-                <button
-                  onClick={() => onNavigate('kiosk')}
-                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  عرض شاشة جهاز الإصدار للمراجعين
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200">
-            <Kiosk
-              issuancePaused={issuancePaused}
-              waitingCount={tickets.filter(t => t.status === 'waiting').length}
-              categories={settings.categories}
-              departmentTitle={settings.departmentTitle}
-              counters={counters}
-              onRefreshState={onRefreshState}
-              onIssueTicket={async (category) => {
-                try {
-                  const data = await adminFetch('/api/tickets', {
-                    method: 'POST',
-                    body: JSON.stringify({ category })
-                  });
-                  onRefreshState();
-                  return data.ticket;
-                } catch (err) {
-                  console.error('Error issuing ticket', err);
-                  return null;
-                }
-              }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* ======================================================== */}
       {/* SECTION 1: إدارة بيانات النظام (SYSTEM DATA MANAGEMENT) */}
       {/* ======================================================== */}
@@ -1539,12 +1458,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-xs text-slate-500">إمكانية إضافة تذاكر يدوياً، تعديل الحالة، إعادة النداء، نقل الدور، أو الحذف والتصفير الشامل</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setActiveTab('issuance_control')}
-                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Ticket className="w-4 h-4 text-amber-400" /> لوحة التحكم الخاصة بإصدار الدور
-                  </button>
                   <button
                     onClick={() => {
                       setTicketFormCategory(settings?.categories?.[0]?.id || 'general');
