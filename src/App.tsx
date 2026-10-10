@@ -404,6 +404,9 @@ export default function App() {
             onNavigate={handleNavigate}
             connected={connected}
             onActivateServer={fetchState}
+            tickets={tickets}
+            counters={counters}
+            staffList={staffList}
           />
         )}
 

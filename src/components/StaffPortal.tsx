@@ -731,105 +731,108 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
       )}
 
       {/* Staff & Counter Header Bar */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-amber-500/30 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl border border-amber-500/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center font-bold text-lg border border-amber-400">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-600 rounded-2xl flex items-center justify-center font-black text-xl border border-amber-400 shrink-0 shadow-md">
             {currentStaff.name.charAt(0)}
           </div>
-          <div>
-            <div className="text-base font-bold flex items-center gap-2">
-              {currentStaff.name}
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-black flex items-center gap-2 flex-wrap">
+              <span>{currentStaff.name}</span>
+              <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${
                 isCounterPaused ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               }`}>
                 {isCounterPaused ? 'متوقف مؤقتاً (استراحة)' : 'يعمل بنشاط'}
               </span>
             </div>
-            <div className="text-xs text-amber-400 font-semibold">
+            <div className="text-xs sm:text-sm text-amber-400 font-bold truncate">
               {activeCounter.name} {activeCounter.assignedServiceName ? `| اختصاص: ${activeCounter.assignedServiceName}` : ''}
             </div>
             {assignedCat?.desc && (
-              <div className="text-[10px] text-slate-300 mt-0.5 italic max-w-sm">
-                مهام الشباك: {assignedCat.desc}
+              <div className="text-[10px] text-slate-300 mt-0.5 italic line-clamp-1">
+                {assignedCat.desc}
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="bg-slate-800 px-3.5 py-2 rounded-xl text-xs border border-slate-700 flex items-center gap-1.5">
+        {/* Quick controls on mobile */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+          <div className="col-span-2 sm:col-auto bg-slate-800/90 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-2 font-bold">
             <Clock className="w-4 h-4 text-amber-400" />
-            <span>الانتظار: <strong className="text-white font-mono text-sm">{waitingTickets.length}</strong></span>
+            <span>الانتظار: <strong className="text-amber-300 font-mono text-base">{waitingTickets.length}</strong></span>
           </div>
 
           <button
             onClick={handleTogglePause}
-            className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${
+            className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-colors flex items-center justify-center gap-1.5 active:scale-95 ${
               isCounterPaused 
                 ? 'bg-emerald-600 text-white border-emerald-500 hover:bg-emerald-500' 
                 : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
             }`}
           >
-            {isCounterPaused ? <Play className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
-            {isCounterPaused ? 'استئناف العمل' : 'استراحة مؤقتة'}
+            {isCounterPaused ? <Play className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
+            <span>{isCounterPaused ? 'استئناف' : 'استراحة'}</span>
           </button>
 
           <button
             onClick={handleReleaseCounter}
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-            title="إنهاء العمل على هذا الشباك واختيار شباك آخر"
+            className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+            title="تبديل الشباك"
           >
-            <ArrowRightLeft className="w-3.5 h-3.5 text-amber-400" />
-            تبديل الشباك
+            <ArrowRightLeft className="w-4 h-4 text-amber-400" />
+            <span>تبديل</span>
           </button>
 
           {onNavigateHome && (
             <button
               onClick={onNavigateHome}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs flex items-center gap-1.5 transition-all"
+              className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
               title="العودة للرئيسية"
             >
-              <Home className="w-3.5 h-3.5 text-amber-400" />
+              <Home className="w-4 h-4 text-amber-400" />
+              <span className="sm:hidden">الرئيسية</span>
             </button>
           )}
 
           <button
             onClick={handleLogout}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-red-400 rounded-xl border border-slate-700 text-xs flex items-center gap-1.5 transition-all"
+            className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-red-400 rounded-xl border border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
             title="تسجيل الخروج"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
+            <span className="sm:hidden">خروج</span>
           </button>
         </div>
       </div>
 
       {/* Main Ticket Control Card */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 space-y-6">
+      <div className="bg-white rounded-3xl p-4 sm:p-8 shadow-xl border border-slate-200 space-y-6">
         
         {/* Currently Served Ticket Banner */}
         <div className="text-center space-y-4">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-wider">
             المراجع الحالي على {activeCounter.name}
           </div>
           
           {myServingTicket ? (
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-500 rounded-3xl p-8 shadow-md space-y-3">
-              <div className="text-6xl sm:text-7xl font-black font-mono tracking-wider text-amber-950">
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-500 rounded-3xl p-6 sm:p-8 shadow-md space-y-3">
+              <div className="text-6xl sm:text-8xl font-black font-mono tracking-wider text-amber-950">
                 {myServingTicket.displayNumber}
               </div>
-              <div className="text-base font-bold text-amber-900">
+              <div className="text-base sm:text-xl font-black text-amber-900">
                 {myServingTicket.categoryNameArabic}
               </div>
               
               <div className="flex items-center justify-center gap-2 pt-1">
                 {myServingTicket.documentingStartedAt ? (
-                  <span className="bg-emerald-600 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
-                    <FileCheck2 className="w-3.5 h-3.5" />
+                  <span className="bg-emerald-600 text-white text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
+                    <FileCheck2 className="w-4 h-4" />
                     قيد توثيق الوكالة الآن
                   </span>
                 ) : (
-                  <span className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
-                    <PhoneCall className="w-3.5 h-3.5" />
+                  <span className="bg-blue-600 text-white text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
+                    <PhoneCall className="w-4 h-4" />
                     تم النداء، بانتظار تقدم المراجع للشباك
                   </span>
                 )}
@@ -838,14 +841,14 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
               {/* Recall Counter Status Badges */}
               <div className="pt-2 flex flex-col items-center gap-2">
                 <div className="flex items-center justify-center gap-2 flex-wrap">
-                  <span className={`text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1.5 border shadow-sm ${
+                  <span className={`text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-black flex items-center gap-1.5 border shadow-sm ${
                     (myServingTicket.recallCount || 0) >= 3
                       ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
                       : (myServingTicket.recallCount || 0) > 0
                         ? 'bg-amber-600 text-white border-amber-700'
                         : 'bg-slate-800 text-slate-200 border-slate-700'
                   }`}>
-                    <PhoneCall className="w-3.5 h-3.5" />
+                    <PhoneCall className="w-4 h-4" />
                     <span>
                       {(myServingTicket.recallCount || 0) === 0
                         ? 'النداء الأولي (0/3 إعادة نداء)'
@@ -854,35 +857,35 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                   </span>
 
                   {(myServingTicket.recallCount || 0) >= 3 ? (
-                    <span className="bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full border border-rose-300">
+                    <span className="bg-rose-100 text-rose-800 text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-full border border-rose-300">
                       جاهز للتجاوز لعدم الحضور
                     </span>
                   ) : (
-                    <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-300">
+                    <span className="bg-amber-100 text-amber-800 text-xs sm:text-sm font-bold px-3 py-1.5 rounded-full border border-amber-300">
                       متبقي {3 - (myServingTicket.recallCount || 0)} نداءات
                     </span>
                   )}
                 </div>
 
                 {(myServingTicket.recallCount || 0) >= 3 && (
-                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-bold max-w-md">
-                    ⚠️ لم يحضر المراجع بعد 3 نداءات. اضغط على الزر الأحمر بالأسفل لتجاوز الدور واستدعاء التالي.
+                  <div className="p-3 bg-rose-50 border-2 border-rose-200 rounded-2xl text-xs sm:text-sm text-rose-800 font-black max-w-md shadow-sm">
+                    ⚠️ لم يحضر المراجع بعد 3 نداءات متتالية. يمكنك الآن تجاوز الدور فوراً لعدم الحضور.
                   </div>
                 )}
               </div>
 
-              <div className="text-xs text-amber-800 font-mono pt-1">
+              <div className="text-xs sm:text-sm text-amber-800 font-mono font-bold pt-1">
                 وقت الاستدعاء: {new Date(myServingTicket.calledAt || '').toLocaleTimeString('ar-SY')}
               </div>
             </div>
           ) : (
-            <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-8 text-slate-500 text-sm font-medium space-y-2">
+            <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-6 sm:p-10 text-slate-500 text-sm font-medium space-y-2">
               {isCounterPaused ? (
-                <div className="text-amber-700 font-bold">
-                  الشباك في حالة استراحة مؤقتة حالياً. اضغط على «استئناف العمل» في الأعلى لبدء النداء.
+                <div className="text-amber-700 font-black text-base">
+                  الشباك في حالة استراحة مؤقتة حالياً. اضغط على «استئناف» في الأعلى لبدء استقبال المراجعين.
                 </div>
               ) : (
-                <div>
+                <div className="text-slate-600 font-bold text-base">
                   لا توجد تذكرة قيد الخدمة حالياً. الشباك جاهز لاستقبال المراجع التالي.
                 </div>
               )}
@@ -890,60 +893,65 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
           )}
         </div>
 
-        {/* Action Buttons Grid */}
-        <div className="space-y-3">
+        {/* Action Buttons Grid - LARGE & MOBILE FRIENDLY */}
+        <div className="space-y-4">
           {!myServingTicket ? (
             <button
               onClick={handleCallNext}
               disabled={actionLoading || waitingTickets.length === 0 || isCounterPaused}
-              className={`w-full py-5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-xl rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 border border-emerald-400 ${
-                waitingTickets.length === 0 || isCounterPaused ? 'opacity-50 cursor-not-allowed' : 'active:scale-98'
+              className={`w-full py-6 sm:py-7 bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xl sm:text-2xl rounded-3xl shadow-2xl transition-all flex items-center justify-center gap-3.5 border-2 border-emerald-400 touch-manipulation cursor-pointer ${
+                waitingTickets.length === 0 || isCounterPaused 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'active:scale-95 ring-4 ring-emerald-500/20'
               }`}
             >
-              <UserCheck className="w-7 h-7" />
-              استدعاء المراجع التالي ({waitingTickets.length} في قائمة الانتظار)
+              <UserCheck className="w-8 h-8 sm:w-9 sm:h-9 shrink-0" />
+              <span>استدعاء المراجع التالي</span>
+              <span className="bg-emerald-800/80 px-3 py-1 rounded-2xl text-base sm:text-lg border border-emerald-400/40">
+                ({waitingTickets.length} متبقي)
+              </span>
             </button>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-3.5">
               
-              {/* Start Documenting Button */}
-              {/* Removed by user request */}
+              {/* Top row buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Recall Button (Max 3 Times) - Big Touch Target */}
+                {myServingTicket.recallCount && myServingTicket.recallCount >= 3 ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="py-5 sm:py-6 bg-slate-100 text-slate-400 font-black rounded-2xl sm:rounded-3xl border-2 border-slate-300 flex items-center justify-center gap-2.5 text-base sm:text-lg cursor-not-allowed"
+                    title="تم استنفاد الحد الأقصى لإعادة النداء (3 مرات)"
+                  >
+                    <PhoneCall className="w-6 h-6 text-slate-400 shrink-0" />
+                    <span>تم استنفاد النداءات (3/3)</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRecall}
+                    disabled={actionLoading}
+                    className="py-5 sm:py-6 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-black rounded-2xl sm:rounded-3xl shadow-xl transition-all flex items-center justify-center gap-2.5 text-base sm:text-lg active:scale-95 cursor-pointer touch-manipulation border-2 border-blue-400/40"
+                  >
+                    <PhoneCall className="w-6 h-6 shrink-0 animate-bounce" />
+                    <span>إعادة النداء ({(myServingTicket.recallCount || 0) + 1} من 3)</span>
+                  </button>
+                )}
 
-              {/* Recall Button (Max 3 Times) */}
-              {myServingTicket.recallCount && myServingTicket.recallCount >= 3 ? (
+                {/* Complete Service Button - Big Touch Target */}
                 <button
                   type="button"
-                  disabled
-                  className="py-3.5 bg-slate-100 text-slate-400 font-bold rounded-2xl border border-slate-300 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-not-allowed"
-                  title="تم استنفاد الحد الأقصى لإعادة النداء (3 مرات)"
-                >
-                  <PhoneCall className="w-4 h-4 text-slate-400" />
-                  <span>تم استنفاد النداءات (3/3)</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleRecall}
+                  onClick={handleComplete}
                   disabled={actionLoading}
-                  className="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
+                  className="py-5 sm:py-6 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black rounded-2xl sm:rounded-3xl shadow-xl transition-all flex items-center justify-center gap-2.5 text-base sm:text-lg active:scale-95 cursor-pointer touch-manipulation border-2 border-emerald-400/40"
                 >
-                  <PhoneCall className="w-4 h-4" />
-                  <span>إعادة النداء ({(myServingTicket.recallCount || 0) + 1} من 3)</span>
+                  <CheckCircle className="w-6 h-6 shrink-0" />
+                  <span>إنهاء الخدمة وتوثيق المعاملة</span>
                 </button>
-              )}
+              </div>
 
-              {/* Complete Service Button */}
-              <button
-                type="button"
-                onClick={handleComplete}
-                disabled={actionLoading}
-                className="py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>إنهاء الخدمة وتوثيق المعاملة</span>
-              </button>
-
-              {/* Skip Ticket Button - Highlighted prominently when 3 recalls reached */}
+              {/* Skip Ticket Button - Very prominent and easy to tap on phones */}
               {(myServingTicket.recallCount || 0) >= 3 ? (
                 <button
                   type="button"
@@ -951,10 +959,10 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                     setSkipNotes('لم يحضر المراجع بعد استدعائه و3 نداءات متتالية على الشباك');
                     setSkipModal(true);
                   }}
-                  className="sm:col-span-2 py-4 bg-gradient-to-r from-rose-600 via-amber-600 to-rose-700 hover:from-rose-500 hover:to-amber-500 text-white font-black rounded-2xl shadow-xl border-2 border-rose-400 flex items-center justify-center gap-2.5 text-sm animate-pulse active:scale-98 cursor-pointer"
+                  className="w-full py-5 sm:py-6 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 text-white font-black rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-rose-400 flex items-center justify-center gap-3 text-base sm:text-lg active:scale-95 cursor-pointer touch-manipulation ring-4 ring-rose-500/20"
                 >
-                  <SkipForward className="w-5 h-5 text-white animate-bounce" />
-                  <span>تجاوز الدور الآن لعدم الحضور (تم النداء 3 مرات)</span>
+                  <SkipForward className="w-6 h-6 text-white shrink-0 animate-pulse" />
+                  <span>تجاوز الدور الآن لعدم الحضور (3/3 نداءات)</span>
                 </button>
               ) : (
                 <button
@@ -964,27 +972,27 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                     setSkipNotes(c > 0 ? `لم يحضر المراجع بعد ${c} نداءات` : 'لم يحضر المراجع عند النداء');
                     setSkipModal(true);
                   }}
-                  className="sm:col-span-2 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-xs active:scale-95 cursor-pointer"
+                  className="w-full py-4 sm:py-5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-2xl sm:rounded-3xl transition-all flex items-center justify-center gap-2.5 text-sm sm:text-base active:scale-95 cursor-pointer touch-manipulation border border-slate-600"
                 >
-                  <SkipForward className="w-4 h-4 text-slate-300" />
-                  <span>تجاوز الدور لعدم الحضور (النداء {myServingTicket.recallCount || 0}/3)</span>
+                  <SkipForward className="w-5 h-5 text-slate-300 shrink-0" />
+                  <span>تجاوز الدور لعدم الحضور ({myServingTicket.recallCount || 0}/3 نداءات)</span>
                 </button>
               )}
             </div>
           )}
 
           {/* Release and Switch Counter Button */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs text-slate-500">
+          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
+            <span className="text-xs sm:text-sm text-slate-500">
               تريد تغيير مكانك أو إنهاء مناوبتك على {activeCounter.name}؟
             </span>
             <button
               onClick={handleReleaseCounter}
               disabled={actionLoading}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-2xl text-xs sm:text-sm font-black transition-colors flex items-center justify-center gap-2 active:scale-95"
             >
-              <ArrowRightLeft className="w-3.5 h-3.5 text-amber-600" />
-              إنهاء العمل على الشباك واختيار شباك آخر
+              <ArrowRightLeft className="w-4 h-4 text-amber-600" />
+              <span>إنهاء العمل وتبديل الشباك</span>
             </button>
           </div>
         </div>

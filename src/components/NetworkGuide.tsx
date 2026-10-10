@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -25,10 +20,18 @@ import {
   Trash2,
   Sparkles,
   Layers,
-  Database
+  Database,
+  Users,
+  Ticket as TicketIcon,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  Hourglass,
+  Activity
 } from 'lucide-react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
 import { clearAppCache, ClearCacheResult } from '../utils/cache';
+import { Ticket, Counter, Staff } from '../types';
 
 interface NetworkGuideProps {
   localIPs: string[];
@@ -37,6 +40,9 @@ interface NetworkGuideProps {
   onNavigate: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
   connected?: boolean;
   onActivateServer?: () => Promise<boolean> | void;
+  tickets?: Ticket[];
+  counters?: Counter[];
+  staffList?: Staff[];
 }
 
 export const NetworkGuide: React.FC<NetworkGuideProps> = ({
@@ -45,7 +51,10 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
   serverAppUrl,
   onNavigate,
   connected = false,
-  onActivateServer
+  onActivateServer,
+  tickets = [],
+  counters = [],
+  staffList = []
 }) => {
   const [overrideIP, setOverrideIP] = useState<string>('');
   const [copiedAgent, setCopiedAgent] = useState(false);
@@ -161,6 +170,51 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
     window.location.hostname !== '127.0.0.1' && 
     window.location.hostname !== '::1';
 
+  // --- Real-Time Statistics Calculations for Home Page ---
+  // 1. عدد المندوبين العاملين على الشبابيك (Active staff at counters)
+  const activeWorkingStaffCount = counters.filter(c => c.isOpen && !c.isPaused && Boolean(c.currentStaffId || c.currentStaffName)).length;
+
+  // 2. إجمالي البطاقات المحجوزة (المسجلة في النظام اليوم)
+  const totalBookedTicketsCount = tickets.length;
+
+  // 3. عدد المعاملات المنجزة حتى اللحظة
+  const completedTicketsCount = tickets.filter(t => t.status === 'completed').length;
+
+  // معاملات قيد الخدمة وبانتظار النداء
+  const waitingTicketsCount = tickets.filter(t => t.status === 'waiting').length;
+  const servingTicketsCount = tickets.filter(t => t.status === 'serving').length;
+  const skippedTicketsCount = tickets.filter(t => t.status === 'skipped').length;
+
+  // 4. معدل الإنجاز (Completion Rate %)
+  const completionRate = totalBookedTicketsCount > 0 
+    ? Math.round((completedTicketsCount / totalBookedTicketsCount) * 100) 
+    : 0;
+
+  // 5. الوقت المتوسط التقريبي لإنجاز معاملة (Average Service Time)
+  const avgServiceTimeMinutes = (() => {
+    const servicedTickets = tickets.filter(t => {
+      if (t.status !== 'completed' || !t.completedAt) return false;
+      const start = t.documentingStartedAt || t.calledAt;
+      return Boolean(start);
+    });
+
+    if (servicedTickets.length === 0) {
+      // إذا لم تكتمل بعد أي معاملة بتوقيتات دقيقة، عرض تقدير افتراضي مبني على وتيرة العمل أو التقدير الطبيعي (مثلاً 4 دقائق)
+      return totalBookedTicketsCount > 0 && completedTicketsCount > 0 ? 4 : 0;
+    }
+
+    const totalDurationSeconds = servicedTickets.reduce((acc, t) => {
+      const start = new Date(t.documentingStartedAt || t.calledAt!).getTime();
+      const end = new Date(t.completedAt!).getTime();
+      const diffSec = Math.max(30, Math.round((end - start) / 1000));
+      // تصفية القيم الشاذة جداً (أكثر من ساعتين مثلاً)
+      return acc + (diffSec > 7200 ? 300 : diffSec);
+    }, 0);
+
+    const avgSeconds = Math.round(totalDurationSeconds / servicedTickets.length);
+    return Math.max(1, Math.round(avgSeconds / 60));
+  })();
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       
@@ -273,6 +327,155 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               <span>إعادة تحميل نظيفة (Hard Refresh)</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SECTION: REAL-TIME OPERATION STATISTICS (إحصائيات التشغيل والعمل اللحظية) */}
+      {/* ========================================================================= */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center">
+              <Activity className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                إحصائيات ومؤشرات التشغيل المباشرة
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                متابعة لحظية ومحدثة مباشرة لنشاط الشبابيك والمعاملات المنجزة والمحجوزة
+              </p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 self-start sm:self-auto bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-3 py-1 rounded-full text-xs font-bold shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span>تحديث مباشر متزامن</span>
+          </div>
+        </div>
+
+        {/* 5 Primary Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+          
+          {/* 1. عدد المندوبين العاملين على الشبابيك */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-blue-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                المندوبين العاملين على الشبابيك
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-blue-600 tracking-tight">
+                {activeWorkingStaffCount}
+                <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">مندوب</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                <span>إجمالي الشبابيك المتاحة:</span>
+                <strong className="text-slate-700 font-mono">{counters.filter(c => c.isOpen).length}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. عدد البطاقات المحجوزة */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-amber-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                البطاقات المحجوزة اليوم
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                <TicketIcon className="w-5 h-5 text-amber-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-amber-600 tracking-tight">
+                {totalBookedTicketsCount}
+                <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">بطاقة</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="text-amber-700 font-bold">{waitingTicketsCount} قيد الانتظار</span>
+                <span>·</span>
+                <span className="text-blue-700 font-bold">{servingTicketsCount} قيد الخدمة</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. معدل الإنجاز */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-indigo-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                معدل الإنجاز
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                <TrendingUp className="w-5 h-5 text-indigo-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <div className="text-3xl font-black font-mono text-indigo-600 tracking-tight flex items-baseline gap-1">
+                <span>{completionRate}%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, Math.max(0, completionRate))}%` }} 
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 4. الوقت المتوسط التقريبي لإنجاز معاملة */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-cyan-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl group-hover:bg-cyan-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                متوسط وقت إنجاز المعاملة
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
+                <Clock className="w-5 h-5 text-cyan-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-cyan-700 tracking-tight">
+                {avgServiceTimeMinutes > 0 ? avgServiceTimeMinutes : '—'}
+                {avgServiceTimeMinutes > 0 && <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">دقيقة</span>}
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                {avgServiceTimeMinutes > 0 ? 'تقريبي لكل معاملة' : 'قيد القياس مع إنجاز المعاملات'}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. عدد المعاملات المنجزة حتى اللحظة */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-emerald-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                المعاملات المنجزة حتى اللحظة
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-emerald-600 tracking-tight">
+                {completedTicketsCount}
+                <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">معاملة</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                {skippedTicketsCount > 0 ? (
+                  <span className="text-slate-600">{skippedTicketsCount} تجاوز لعدم الحضور</span>
+                ) : (
+                  <span className="text-emerald-700 font-medium">تم توثيقها بنجاح</span>
+                )}
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 

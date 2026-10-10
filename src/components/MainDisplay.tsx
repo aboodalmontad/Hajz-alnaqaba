@@ -20,7 +20,6 @@ import {
   CheckCircle2,
   Maximize2,
   Minimize2,
-  History,
   Layers,
   ArrowRight,
   Monitor,
@@ -101,6 +100,44 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
     return () => clearInterval(interval);
   }, [activeRecall]);
 
+  // Track new ticket additions to play the chime and notify ticket owner when a number is added
+  const [prevTicketsCount, setPrevTicketsCount] = useState<number>(tickets.length);
+  const [prevLatestTicketId, setPrevLatestTicketId] = useState<string>(tickets[tickets.length - 1]?.id || '');
+
+  useEffect(() => {
+    if (tickets.length > prevTicketsCount) {
+      const latestTicket = tickets[tickets.length - 1];
+      if (latestTicket && latestTicket.id !== prevLatestTicketId && latestTicket.status === 'waiting') {
+        if (settings.soundAlertsEnabled && audioEnabled) {
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const playTone = (freq: number, start: number, duration: number, vol = 0.28) => {
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+              gain.gain.setValueAtTime(vol, audioCtx.currentTime + start);
+              gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + start + duration);
+              osc.connect(gain);
+              gain.connect(audioCtx.destination);
+              osc.start(audioCtx.currentTime + start);
+              osc.stop(audioCtx.currentTime + start + duration);
+            };
+            playTone(523.25, 0.0, 0.60, 0.30);  // C5
+            playTone(659.25, 0.30, 0.65, 0.30); // E5
+            playTone(783.99, 0.60, 0.75, 0.32); // G5
+            playTone(1046.50, 0.90, 1.30, 0.35); // C6
+            playTone(1318.51, 1.35, 1.50, 0.33); // E6
+          } catch (e) {}
+        }
+      }
+    }
+    setPrevTicketsCount(tickets.length);
+    if (tickets.length > 0) {
+      setPrevLatestTicketId(tickets[tickets.length - 1].id);
+    }
+  }, [tickets, settings.soundAlertsEnabled, audioEnabled, prevTicketsCount, prevLatestTicketId]);
+
   // Play audio chime and text-to-speech when lastCalledTicket changes
   useEffect(() => {
     if (!lastCalledTicket) return;
@@ -123,67 +160,55 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
       setHighlightTicketId(null);
     }, isRecall ? 14000 : 9000);
 
-    // Audio chime using Web Audio API
+    // Audio chime using Web Audio API (أصوات موسيقية تنبيهية ونغمية أطول وأكثر جذباً للانتباه)
     if (settings.soundAlertsEnabled && audioEnabled) {
       try {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         
         if (isRecall) {
-          // Urgent multi-tone announcement bell for recall: D5 -> F#5 -> A5 -> D6
-          const playAlertTone = (freq: number, start: number, duration: number) => {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
-            gain.gain.setValueAtTime(0.28, audioCtx.currentTime + start);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(audioCtx.currentTime + start);
-            osc.stop(audioCtx.currentTime + start + duration);
-          };
-          playAlertTone(587.33, 0.0, 0.25);
-          playAlertTone(739.99, 0.18, 0.25);
-          playAlertTone(880.00, 0.36, 0.25);
-          playAlertTone(1174.66, 0.54, 0.65);
-        } else {
-          // Standard pleasant chime for normal call: C5 -> E5 -> G5
-          const playTone = (freq: number, start: number, duration: number) => {
+          // نغمة موسيقية مميزة وطويلة لإعادة النداء: لحن تنبيهي قوي ومتدرج (D5 -> F#5 -> A5 -> D6 -> F#6)
+          const playAlertTone = (freq: number, start: number, duration: number, vol = 0.32) => {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
-            gain.gain.setValueAtTime(0.22, audioCtx.currentTime + start);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + duration);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime + start);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + start + duration);
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start(audioCtx.currentTime + start);
             osc.stop(audioCtx.currentTime + start + duration);
           };
-          playTone(523.25, 0.0, 0.4);
-          playTone(659.25, 0.25, 0.6);
-          playTone(783.99, 0.5, 0.8);
+          playAlertTone(587.33, 0.0, 0.55, 0.35);   // D5
+          playAlertTone(739.99, 0.30, 0.55, 0.35);  // F#5
+          playAlertTone(880.00, 0.60, 0.65, 0.38);  // A5
+          playAlertTone(1174.66, 0.90, 1.20, 0.40); // D6
+          playAlertTone(1479.98, 1.30, 1.40, 0.38); // F#6 (إطالة ولحن إضافي لفت الانتباه)
+        } else {
+          // نغمة موسيقية أطول وأكثر جاذبية عند استدعاء بطاقة جديدة: لحن متناغم ثري (C5 -> E5 -> G5 -> C6 -> E6)
+          const playTone = (freq: number, start: number, duration: number, vol = 0.28) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime + start);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + start + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + start);
+            osc.stop(audioCtx.currentTime + start + duration);
+          };
+          playTone(523.25, 0.0, 0.60, 0.30);  // C5
+          playTone(659.25, 0.30, 0.65, 0.30); // E5
+          playTone(783.99, 0.60, 0.75, 0.32); // G5
+          playTone(1046.50, 0.90, 1.30, 0.35); // C6
+          playTone(1318.51, 1.35, 1.50, 0.33); // E6 (نغمة ختامية طويلة ومميزة)
         }
       } catch (e) {
         // AudioContext fallback
       }
 
-      // Arabic Speech synthesis
-      if ('speechSynthesis' in window) {
-        try {
-          const phrase = isRecall
-            ? recallNum >= 3
-              ? `تنبيه، النداء الأخير للمراجع صاحب التذكرة رقم ${lastCalledTicket.ticket.displayNumber}، يرجى التوجه فوراً وبسرعة إلى ${lastCalledTicket.counter} لتجنب تجاوز الدور لعدم الحضور`
-              : `تنبيه، إعادة نداء للمراجع صاحب التذكرة رقم ${lastCalledTicket.ticket.displayNumber}، النداء رقم ${recallNum} من ثلاثة، يرجى التوجه إلى ${lastCalledTicket.counter}`
-            : `تذكرة رقم ${lastCalledTicket.ticket.displayNumber}، يرجى التوجه إلى ${lastCalledTicket.counter}`;
-          const utterance = new SpeechSynthesisUtterance(phrase);
-          utterance.lang = 'ar-SA';
-          utterance.rate = 0.88;
-          window.speechSynthesis.speak(utterance);
-        } catch (err) {
-          // Speech synth fallback
-        }
-      }
+      // تم إلغاء القراءة الصوتية (SpeechSynthesis) بناءً على طلب المستخدم: إصدار صوت موسيقى فقط بدون قراءة الأرقام
     }
 
     return () => clearTimeout(timeout);
@@ -199,16 +224,7 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
     return tickets.filter(t => t.status === 'waiting');
   }, [tickets]);
 
-  // قائمة جميع البطاقات التي أتى دورها (سواء قيد الخدمة حالياً أو تم استدعاؤها مؤخراً)
-  const calledTicketsHistory = useMemo(() => {
-    return tickets
-      .filter(t => t.calledAt || t.status === 'serving' || (t.status === 'completed' && t.counterName))
-      .sort((a, b) => {
-        const timeA = new Date(a.calledAt || a.createdAt).getTime();
-        const timeB = new Date(b.calledAt || b.createdAt).getTime();
-        return timeB - timeA;
-      });
-  }, [tickets]);
+
 
   // قائمة موحدة وشاملة للبطاقات التي أتى دورها الآن على الشبابيك
   // تتضمن كل شباك مفتوح مع تذكرته، وأي تذكرة serving حتى لو لم تكن مطابقة بالمعرّف
@@ -483,126 +499,82 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
         </div>
 
         {/* ======================================================== */}
-        {/* SECTION 2 & 3: RECENTLY CALLED TICKETS & WAITING QUEUE (الأعمدة الجانبية) */}
+        {/* SECTION 2: WAITING QUEUE ONLY (قائمة قيد الانتظار فقط) */}
         {/* ======================================================== */}
         {displayMode === 'all' && (
-          <div className="lg:col-span-4 space-y-4 flex flex-col">
-            
-            {/* A. RECENTLY CALLED TICKETS (سجل البطاقات التي أتى دورها مؤخراً) */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col flex-1">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="text-sm sm:text-base font-black text-amber-400 flex items-center gap-2">
-                  <History className="w-4 h-4 text-amber-400" />
-                  سجل الأرقام التي أتى دورها مؤخراً
-                </h3>
-                <span className="bg-amber-500/10 text-amber-400 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                  {calledTicketsHistory.length}
-                </span>
-              </div>
-
-              <div className="py-3 flex-1 overflow-y-auto max-h-[300px] space-y-2">
-                {calledTicketsHistory.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 text-xs">
-                    لم يتم استدعاء أي رقم دور حتى الآن
+          <div className="lg:col-span-4 flex flex-col">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col flex-1">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3.5 border-b border-slate-800 gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-sky-400" />
                   </div>
-                ) : (
-                  calledTicketsHistory.slice(0, 7).map((t, idx) => {
-                    const isServingNow = t.status === 'serving';
-                    const isCompleted = t.status === 'completed';
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-slate-100 flex items-center gap-2">
+                      قائمة قيد الانتظار
+                    </h3>
+                    <p className="text-[11px] text-slate-400">الأدوار القادمة في صالة المراجعين</p>
+                  </div>
+                </div>
 
-                    return (
-                      <div 
-                        key={t.id}
-                        className={`rounded-xl p-2.5 border flex items-center justify-between transition-all ${
-                          isServingNow
-                            ? 'bg-amber-950/40 border-amber-500/50 shadow-sm'
-                            : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`w-6 h-6 rounded-lg text-xs font-mono font-black flex items-center justify-center ${
-                            isServingNow 
-                              ? 'bg-amber-500 text-slate-950' 
-                              : 'bg-slate-800 text-slate-400'
-                          }`}>
-                            #{idx + 1}
-                          </span>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-base font-mono font-black text-white">{t.displayNumber}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                isServingNow 
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                                  : isCompleted 
-                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                    : 'bg-slate-800 text-slate-400'
-                              }`}>
-                                {isServingNow ? 'قيد الخدمة' : isCompleted ? 'مكتمل' : 'مستدعى'}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-400">
-                              {t.counterName || 'الشباك'} • {t.categoryNameArabic}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-[11px] font-mono text-amber-300/80">
-                          {t.calledAt ? new Date(t.calledAt).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* B. WAITING QUEUE (الدور القادم - قائمة الانتظار) */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col flex-1">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="text-sm sm:text-base font-black text-slate-200 flex items-center gap-2">
-                  <Tv className="w-4 h-4 text-sky-400" />
-                  الدور القادم (قيد الانتظار في الصالة)
-                </h3>
-                <span className="bg-sky-500/10 text-sky-400 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border border-sky-500/20">
-                  {waitingTickets.length} منتظر
+                <span className="bg-sky-500/15 text-sky-300 text-xs font-mono font-bold px-3 py-1 rounded-full border border-sky-500/30 flex items-center gap-1.5 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                  {waitingTickets.length} بالانتظار
                 </span>
               </div>
 
-              <div className="py-3 flex-1 overflow-y-auto max-h-[260px] space-y-2">
+              {/* Waiting List Items */}
+              <div className="py-3 flex-1 overflow-y-auto max-h-[calc(100vh-16rem)] space-y-2.5 pr-1">
                 {waitingTickets.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 text-xs">
-                    لا توجد أرقام في قائمة الانتظار حالياً
+                  <div className="h-full flex flex-col items-center justify-center py-16 text-center space-y-2">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-1">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-300">لا توجد أرقام في الانتظار حالياً</span>
+                    <span className="text-xs text-slate-500">تمت خدمة جميع المراجعين المسجلين في الصالة</span>
                   </div>
                 ) : (
-                  waitingTickets.slice(0, 6).map((t, idx) => (
+                  waitingTickets.map((t, idx) => (
                     <div 
                       key={t.id}
-                      className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between shadow-sm hover:border-amber-500/30 transition-all"
+                      className="bg-slate-950/70 border border-slate-800 hover:border-sky-500/40 rounded-2xl p-3 flex items-center justify-between shadow-sm transition-all group"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 text-xs font-mono font-bold flex items-center justify-center">
+                      <div className="flex items-center gap-3">
+                        <span className="w-7 h-7 rounded-xl bg-slate-800 text-slate-300 text-xs font-mono font-black flex items-center justify-center group-hover:bg-sky-500 group-hover:text-slate-950 transition-colors">
                           {idx + 1}
                         </span>
                         <div>
-                          <div className="text-base font-mono font-black text-white">{t.displayNumber}</div>
-                          <div className="text-[10px] text-slate-400">{t.categoryNameArabic}</div>
+                          <div className="text-lg font-mono font-black text-white group-hover:text-sky-300 transition-colors">
+                            {t.displayNumber}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {t.categoryNameArabic}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        {new Date(t.createdAt).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' })}
+
+                      <div className="text-left">
+                        <div className="text-[11px] font-mono text-slate-400">
+                          {new Date(t.createdAt).toLocaleTimeString('ar-SY', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <span className="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60">
+                          قيد الانتظار
+                        </span>
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              {waitingTickets.length > 6 && (
-                <div className="pt-2 text-center text-[11px] text-slate-500">
-                  + {waitingTickets.length - 6} مراجعين آخرين في الصالة
+              {waitingTickets.length > 0 && (
+                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                  <span>إجمالي المنتظرين في الصالة:</span>
+                  <span className="font-mono font-bold text-sky-400 text-sm">{waitingTickets.length}</span>
                 </div>
               )}
             </div>
-
           </div>
         )}
 
@@ -733,10 +705,10 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
           <button
             onClick={() => setDisplayMode(prev => prev === 'all' ? 'serving-only' : 'all')}
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-700 bg-slate-800/80 hover:bg-slate-750 text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer"
-            title="تبديل وضع العرض"
+            title="إظهار أو إخفاء قائمة الانتظار"
           >
             <Layers className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden xl:inline">{displayMode === 'all' ? 'أرقام حالية فقط' : 'عرض شامل'}</span>
+            <span className="hidden xl:inline">{displayMode === 'all' ? 'الشبابيك فقط' : 'إظهار قائمة الانتظار'}</span>
           </button>
 
           {/* Test Recall Button */}

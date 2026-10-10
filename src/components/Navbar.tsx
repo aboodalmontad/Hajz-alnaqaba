@@ -227,31 +227,50 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Mobile Bottom Navigation Bar */}
-          <div className="flex xl:hidden overflow-x-auto py-2 gap-1.5 border-t border-slate-800 text-xs scrollbar-none">
-
+          <div className="flex xl:hidden overflow-x-auto py-2.5 px-1 gap-2 border-t border-slate-800 text-xs sm:text-sm scrollbar-none">
             <button
               onClick={() => setCurrentTab('staff')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'staff' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'staff' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <Smartphone className="w-3.5 h-3.5 text-amber-400" /> المندوب (/agent)
+              <Smartphone className="w-4 h-4 text-amber-400" />
+              <span>بوابة المندوب</span>
             </button>
             <button
               onClick={() => setCurrentTab('kiosk')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'kiosk' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'kiosk' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <Ticket className="w-3.5 h-3.5" /> إصدار دور
+              <Ticket className="w-4 h-4" />
+              <span>إصدار دور</span>
             </button>
             <button
               onClick={() => setCurrentTab('display')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'display' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'display' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <Tv className="w-3.5 h-3.5" /> الشاشة
+              <Tv className="w-4 h-4" />
+              <span>الشاشة</span>
             </button>
             <button
               onClick={() => setCurrentTab('admin')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'admin' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'admin' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <ShieldAlert className="w-3.5 h-3.5" /> المدير
+              <ShieldAlert className="w-4 h-4" />
+              <span>لوحة المدير</span>
             </button>
           </div>
 
