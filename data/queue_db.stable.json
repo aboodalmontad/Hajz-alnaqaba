@@ -1,6 +1,6 @@
 {
   "date": "2026-10-10",
-  "ticketSequence": 0,
+  "ticketSequence": 7,
   "issuancePaused": false,
   "settings": {
     "departmentTitle": "دائرة الوكالات – نقابة المحامين بحلب",
@@ -34,13 +34,108 @@
       }
     ]
   },
-  "tickets": [],
+  "tickets": [
+    {
+      "id": "ticket-1791659314885-dl3e",
+      "number": 7,
+      "displayNumber": "A-007",
+      "category": "special",
+      "categoryNameArabic": "توثيق وكالة",
+      "counterId": "counter-1791640239853",
+      "counterName": "الشباك 2",
+      "status": "completed",
+      "createdAt": "2026-10-10T19:08:34.885Z",
+      "calledAt": "2026-10-10T19:40:11.380Z",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "completedAt": "2026-10-10T19:40:13.475Z"
+    },
+    {
+      "id": "ticket-1791659311966-gjew",
+      "number": 6,
+      "displayNumber": "A-006",
+      "category": "special",
+      "categoryNameArabic": "توثيق وكالة",
+      "counterId": "counter-1791640239853",
+      "counterName": "الشباك 2",
+      "status": "completed",
+      "createdAt": "2026-10-10T19:08:31.966Z",
+      "calledAt": "2026-10-10T19:40:03.160Z",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "completedAt": "2026-10-10T19:40:10.291Z"
+    },
+    {
+      "id": "ticket-1791658790311-y7du",
+      "number": 5,
+      "displayNumber": "B-005",
+      "category": "cat_1791641888137",
+      "categoryNameArabic": "الحصول على صورة عن وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T18:59:50.311Z"
+    },
+    {
+      "id": "ticket-1791658788776-iiqs",
+      "number": 4,
+      "displayNumber": "C-004",
+      "category": "cat_1791677992936",
+      "categoryNameArabic": "عزل وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T18:59:48.776Z"
+    },
+    {
+      "id": "ticket-1791658787013-927g",
+      "number": 3,
+      "displayNumber": "A-003",
+      "category": "special",
+      "categoryNameArabic": "توثيق وكالة",
+      "counterId": "counter-1791640239853",
+      "counterName": "الشباك 2",
+      "status": "completed",
+      "createdAt": "2026-10-10T18:59:47.013Z",
+      "calledAt": "2026-10-10T19:39:54.148Z",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "completedAt": "2026-10-10T19:40:00.785Z"
+    },
+    {
+      "id": "ticket-1791658783679-08tp",
+      "number": 2,
+      "displayNumber": "A-002",
+      "category": "special",
+      "categoryNameArabic": "توثيق وكالة",
+      "counterId": "counter-1791640239853",
+      "counterName": "الشباك 2",
+      "status": "skipped",
+      "createdAt": "2026-10-10T18:59:43.679Z",
+      "calledAt": "2026-10-10T19:39:21.459Z",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "recallCount": 3,
+      "notes": "لم يحضر المراجع بعد استدعائه و3 نداءات متتالية على الشباك"
+    },
+    {
+      "id": "ticket-1791658780534-slat",
+      "number": 1,
+      "displayNumber": "A-001",
+      "category": "special",
+      "categoryNameArabic": "توثيق وكالة",
+      "counterId": "counter-1791640234085",
+      "counterName": "الشباك 1",
+      "status": "serving",
+      "createdAt": "2026-10-10T18:59:40.534Z",
+      "calledAt": "2026-10-10T19:00:13.025Z",
+      "staffId": "staff-1791657691085",
+      "staffName": "محمود ويس",
+      "recallCount": 2
+    }
+  ],
   "staff": [
     {
       "id": "staff-1791572701221",
       "name": "حسان مرشحة",
       "pin": "123456",
-      "counterId": "",
+      "counterId": "counter-1791640239853",
       "active": true,
       "role": "staff",
       "jobTitle": "مندوب وكالات",
@@ -55,6 +150,16 @@
       "role": "staff",
       "jobTitle": "مندوب وكالات",
       "allowedCounterIds": []
+    },
+    {
+      "id": "staff-1791657691085",
+      "name": "محمود ويس",
+      "pin": "123456",
+      "counterId": "counter-1791640234085",
+      "active": true,
+      "role": "staff",
+      "jobTitle": "مندوب وكالات",
+      "allowedCounterIds": []
     }
   ],
   "counters": [
@@ -62,7 +167,10 @@
       "id": "counter-1791640234085",
       "name": "الشباك 1",
       "isOpen": true,
-      "isPaused": false
+      "isPaused": false,
+      "currentStaffId": "staff-1791657691085",
+      "currentStaffName": "محمود ويس",
+      "claimedAt": "2026-10-10T19:00:11.489Z"
     },
     {
       "id": "counter-1791640239853",
@@ -70,7 +178,10 @@
       "isOpen": true,
       "isPaused": false,
       "assignedServiceId": "special",
-      "assignedServiceName": "توثيق وكالة"
+      "assignedServiceName": "توثيق وكالة",
+      "currentStaffId": "staff-1791572701221",
+      "currentStaffName": "حسان مرشحة",
+      "claimedAt": "2026-10-10T19:39:19.466Z"
     },
     {
       "id": "counter-1791640243217",
@@ -97,8 +208,281 @@
       "assignedServiceName": "الحصول على صورة عن وكالة"
     }
   ],
-  "counterSessions": [],
+  "counterSessions": [
+    {
+      "id": "cs-1791661159466-dhjv",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "counterId": "counter-1791640239853",
+      "counterName": "الشباك 2",
+      "startedAt": "2026-10-10T19:39:19.466Z"
+    },
+    {
+      "id": "cs-1791658811489-t6it",
+      "staffId": "staff-1791657691085",
+      "staffName": "محمود ويس",
+      "counterId": "counter-1791640234085",
+      "counterName": "الشباك 1",
+      "startedAt": "2026-10-10T19:00:11.489Z"
+    }
+  ],
   "auditLogs": [
+    {
+      "id": "log-1791661213479-7ayo",
+      "timestamp": "2026-10-10T19:40:13.479Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-007 بنجاح على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661211383-owhr",
+      "timestamp": "2026-10-10T19:40:11.383Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف حسان مرشحة على الشباك 2 استدعى التذكرة A-007",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661210296-tdql",
+      "timestamp": "2026-10-10T19:40:10.296Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-006 بنجاح على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661203164-wfed",
+      "timestamp": "2026-10-10T19:40:03.164Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف حسان مرشحة على الشباك 2 استدعى التذكرة A-006",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661200788-9bsd",
+      "timestamp": "2026-10-10T19:40:00.788Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-003 بنجاح على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661194152-ou39",
+      "timestamp": "2026-10-10T19:39:54.152Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف حسان مرشحة على الشباك 2 استدعى التذكرة A-003",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661192666-cnz4",
+      "timestamp": "2026-10-10T19:39:52.666Z",
+      "action": "تجاوز الدور",
+      "details": "تم تجاوز التذكرة A-002 - السبب: لم يحضر المراجع بعد استدعائه و3 نداءات متتالية على الشباك",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661188484-eul9",
+      "timestamp": "2026-10-10T19:39:48.484Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء (المرة 3 من 3) للتذكرة A-002 على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661182554-2dt6",
+      "timestamp": "2026-10-10T19:39:42.554Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء (المرة 2 من 3) للتذكرة A-002 على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661167145-4bq8",
+      "timestamp": "2026-10-10T19:39:27.145Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء (المرة 1 من 3) للتذكرة A-002 على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661161464-hsos",
+      "timestamp": "2026-10-10T19:39:21.464Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف حسان مرشحة على الشباك 2 استدعى التذكرة A-002",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791661159469-uw40",
+      "timestamp": "2026-10-10T19:39:19.469Z",
+      "action": "بدء العمل على الشباك",
+      "details": "قام المندوب حسان مرشحة بحجز وبدء العمل على الشباك 2",
+      "user": "حسان مرشحة",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791661149797-isft",
+      "timestamp": "2026-10-10T19:39:09.797Z",
+      "action": "تسجيل دخول موظف",
+      "details": "قام الموظف حسان مرشحة بتسجيل الدخول عبر الهاتف",
+      "user": "حسان مرشحة",
+      "category": "auth"
+    },
+    {
+      "id": "log-1791659337197-xtiw",
+      "timestamp": "2026-10-10T19:08:57.197Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء (المرة 2 من 3) للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791659320262-3ks9",
+      "timestamp": "2026-10-10T19:08:40.262Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء (المرة 1 من 3) للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791659314889-0q0m",
+      "timestamp": "2026-10-10T19:08:34.889Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-007 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791659311970-uglh",
+      "timestamp": "2026-10-10T19:08:31.970Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-006 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658930315-rir3",
+      "timestamp": "2026-10-10T19:02:10.315Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658912591-g6vx",
+      "timestamp": "2026-10-10T19:01:52.591Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658911850-a7ol",
+      "timestamp": "2026-10-10T19:01:51.851Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658909952-xdhr",
+      "timestamp": "2026-10-10T19:01:49.952Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658891545-pxxo",
+      "timestamp": "2026-10-10T19:01:31.545Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658871969-u3ew",
+      "timestamp": "2026-10-10T19:01:11.970Z",
+      "action": "إعادة النداء",
+      "details": "إعادة النداء للتذكرة A-001 على الشباك 1",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658813031-1h1t",
+      "timestamp": "2026-10-10T19:00:13.031Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف محمود ويس على الشباك 1 استدعى التذكرة A-001",
+      "user": "محمود ويس",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658811493-s9t2",
+      "timestamp": "2026-10-10T19:00:11.493Z",
+      "action": "بدء العمل على الشباك",
+      "details": "قام المندوب محمود ويس بحجز وبدء العمل على الشباك 1",
+      "user": "محمود ويس",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791658805038-hn9t",
+      "timestamp": "2026-10-10T19:00:05.038Z",
+      "action": "تسجيل دخول موظف",
+      "details": "قام الموظف محمود ويس بتسجيل الدخول عبر الهاتف",
+      "user": "محمود ويس",
+      "category": "auth"
+    },
+    {
+      "id": "log-1791658790315-cnkj",
+      "timestamp": "2026-10-10T18:59:50.315Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم B-005 (الحصول على صورة عن وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658788780-j8mj",
+      "timestamp": "2026-10-10T18:59:48.780Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم C-004 (عزل وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658787017-h91o",
+      "timestamp": "2026-10-10T18:59:47.017Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-003 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658783683-bghy",
+      "timestamp": "2026-10-10T18:59:43.683Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-002 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791658780539-v6oi",
+      "timestamp": "2026-10-10T18:59:40.539Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-001 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791657691089-p2p7",
+      "timestamp": "2026-10-10T18:41:31.089Z",
+      "action": "إضافة وحفظ موظف/مندوب جديد",
+      "details": "تمت إضافة وحفظ حساب (مندوب وكالات) محمود ويس بنجاح",
+      "user": "المدير العام",
+      "category": "staff"
+    },
     {
       "id": "log-1791657227660-pora",
       "timestamp": "2026-10-10T18:33:47.660Z",
@@ -3572,6 +3956,7 @@
     "admin-token-1791583873309-f5a5076de104188fe5678b237e1fb91f",
     "admin-token-1791636292870-287e80adc6d3b1d1b9bd607d170ecee7",
     "admin-token-1791644568772-2a196dbc6cf8458b7a02dff8209cf7e4",
-    "admin-token-1791646206829-2d6421efc0c694d1a9a1073eefb82ec9"
+    "admin-token-1791646206829-2d6421efc0c694d1a9a1073eefb82ec9",
+    "admin-token-1791657043535-70ff3b96b749ff00bf2c2205dd3178de"
   ]
 }

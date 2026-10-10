@@ -211,7 +211,7 @@ const defaultDb: DatabaseSchema = {
       id: 'staff-1791572701221',
       name: 'حسان مرشحة',
       pin: '123456',
-      counterId: '',
+      counterId: 'counter-1791640239853',
       active: true,
       role: 'staff',
       jobTitle: 'مندوب وكالات',
@@ -222,6 +222,16 @@ const defaultDb: DatabaseSchema = {
       name: 'زكريا ننه',
       pin: '123456',
       counterId: '',
+      active: true,
+      role: 'staff',
+      jobTitle: 'مندوب وكالات',
+      allowedCounterIds: []
+    },
+    {
+      id: 'staff-1791657691085',
+      name: 'محمود ويس',
+      pin: '123456',
+      counterId: 'counter-1791640234085',
       active: true,
       role: 'staff',
       jobTitle: 'مندوب وكالات',
@@ -272,74 +282,52 @@ const defaultDb: DatabaseSchema = {
   auditLogs: []
 };
 
-function getCandidateDbPaths(): string[] {
-  const cwd = process.cwd();
-  return [
-    join(cwd, 'data', 'queue_db.json'),
-    join(cwd, 'data', 'queue_db.backup.json'),
-    join(cwd, 'data', 'queue_db.stable.json'),
+function loadDb(): DatabaseSchema {
+  const primaryDbPath = join(process.cwd(), 'data', 'queue_db.json');
+  
+  // 1. Primary database: Directly load the manager's active database file
+  if (fs.existsSync(primaryDbPath)) {
+    try {
+      const raw = fs.readFileSync(primaryDbPath, 'utf8');
+      const parsed = JSON.parse(raw) as DatabaseSchema;
+      if (parsed && typeof parsed === 'object' && parsed.settings) {
+        DB_FILE = primaryDbPath;
+        // Mirror to backup locations safely
+        saveDb(parsed);
+        return parsed;
+      }
+    } catch (e) {
+      console.warn('Error reading primary queue_db.json, checking backup files:', e);
+    }
+  }
+
+  // 2. Only if primary file is missing or corrupted, check backups in order
+  const backupPaths = [
+    join(process.cwd(), 'data', 'queue_db.backup.json'),
+    join(process.cwd(), 'data', 'queue_db.stable.json'),
     join(__dirname, 'data', 'queue_db.json'),
-    join('/app/applet/data', 'queue_db.json'),
     join(os.tmpdir(), 'queue_data', 'queue_db.json'),
     join(os.tmpdir(), 'queue_db.json')
   ];
-}
 
-function loadDb(): DatabaseSchema {
-  const candidatePaths = getCandidateDbPaths();
-  let bestData: DatabaseSchema | null = null;
-  let maxScore = -1;
-
-  for (const filePath of candidatePaths) {
+  for (const filePath of backupPaths) {
     if (fs.existsSync(filePath)) {
       try {
         const raw = fs.readFileSync(filePath, 'utf8');
         const parsed = JSON.parse(raw) as DatabaseSchema;
-        if (parsed && typeof parsed === 'object') {
-          // Calculate score based on richness of preserved data
-          let score = 0;
-          if (Array.isArray(parsed.staff) && parsed.staff.length > 0) score += parsed.staff.length * 10;
-          if (Array.isArray(parsed.counters) && parsed.counters.length > 0) score += parsed.counters.length * 10;
-          if (parsed.settings?.categories && parsed.settings.categories.length > 0) score += parsed.settings.categories.length * 10;
-          if (Array.isArray(parsed.tickets)) score += parsed.tickets.length;
-          if (Array.isArray(parsed.auditLogs)) score += Math.min(parsed.auditLogs.length, 50);
-
-          if (score > maxScore) {
-            maxScore = score;
-            bestData = parsed;
-            DB_FILE = filePath;
-          }
+        if (parsed && typeof parsed === 'object' && parsed.settings) {
+          DB_FILE = filePath;
+          saveDb(parsed);
+          return parsed;
         }
       } catch (e) {
-        console.warn(`Could not parse candidate DB file ${filePath}:`, e);
+        // Continue
       }
     }
   }
 
-  if (bestData) {
-    // Preserve user configuration completely without reverting to defaults
-    if (!bestData.settings) bestData.settings = { ...defaultSettings };
-    if (!bestData.settings.categories || bestData.settings.categories.length === 0) {
-      bestData.settings.categories = defaultSettings.categories;
-    }
-    if (!bestData.settings.adminPin) bestData.settings.adminPin = '9999';
-    if (!bestData.settings.departmentTitle) bestData.settings.departmentTitle = defaultSettings.departmentTitle;
-    if (!bestData.settings.departmentSubtitle) bestData.settings.departmentSubtitle = defaultSettings.departmentSubtitle;
-    if (!bestData.settings.tickerMessage) bestData.settings.tickerMessage = defaultSettings.tickerMessage;
-    if (typeof bestData.settings.soundAlertsEnabled !== 'boolean') bestData.settings.soundAlertsEnabled = true;
-    if (!Array.isArray(bestData.auditLogs)) bestData.auditLogs = [];
-    if (!Array.isArray(bestData.counterSessions)) bestData.counterSessions = [];
-    if (!Array.isArray(bestData.tickets)) bestData.tickets = [];
-    if (!Array.isArray(bestData.staff)) bestData.staff = defaultDb.staff;
-    if (!Array.isArray(bestData.counters)) bestData.counters = defaultDb.counters;
-
-    // Immediately mirror to all persistent locations to prevent future loss
-    saveDb(bestData);
-    return bestData;
-  }
-
-  // Fallback to initial structured default DB with verified user layout
-  console.log('No existing DB found across candidate paths, initializing with stable database.');
+  // Fallback only if no files exist at all
+  console.log('No existing DB found, initializing fresh database.');
   saveDb(defaultDb);
   return defaultDb;
 }

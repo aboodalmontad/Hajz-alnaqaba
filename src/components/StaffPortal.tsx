@@ -71,11 +71,6 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
       const staff = staffList.find(s => s.id === selectedStaffId);
       if (staff) {
         setStaffSearch(staff.name);
-      } else {
-        // Staff no longer exists, clear the invalid saved ID
-        setSelectedStaffId('');
-        localStorage.removeItem('saved_staff_id');
-        setStaffSearch('');
       }
     }
   }, [selectedStaffId, staffList]);

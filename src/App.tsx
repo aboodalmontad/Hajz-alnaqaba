@@ -51,7 +51,7 @@ const defaultInitialStaff: Staff[] = [
     id: 'staff-1791572701221',
     name: 'حسان مرشحة',
     pin: '123456',
-    counterId: '',
+    counterId: 'counter-1791640239853',
     active: true,
     role: 'staff',
     jobTitle: 'مندوب وكالات',
@@ -62,6 +62,16 @@ const defaultInitialStaff: Staff[] = [
     name: 'زكريا ننه',
     pin: '123456',
     counterId: '',
+    active: true,
+    role: 'staff',
+    jobTitle: 'مندوب وكالات',
+    allowedCounterIds: []
+  },
+  {
+    id: 'staff-1791657691085',
+    name: 'محمود ويس',
+    pin: '123456',
+    counterId: 'counter-1791640234085',
     active: true,
     role: 'staff',
     jobTitle: 'مندوب وكالات',
@@ -192,12 +202,12 @@ export default function App() {
     return apiFetch('/api/state')
       .then(data => {
         setConnected(true);
-        if (data.tickets) setTickets(data.tickets);
-        if (data.staff && data.staff.length > 0) {
+        if (data.tickets && Array.isArray(data.tickets)) setTickets(data.tickets);
+        if (data.staff && Array.isArray(data.staff)) {
           setStaffList(data.staff);
           try { localStorage.setItem('agency_staff_backup', JSON.stringify(data.staff)); } catch {}
         }
-        if (data.counters && data.counters.length > 0) setCounters(data.counters);
+        if (data.counters && Array.isArray(data.counters)) setCounters(data.counters);
         if (data.counterSessions) setCounterSessions(data.counterSessions);
         if (typeof data.issuancePaused === 'boolean') setIssuancePaused(data.issuancePaused);
         if (data.date) setDate(data.date);
@@ -266,12 +276,12 @@ export default function App() {
       });
 
       socket.on('state_update', (state) => {
-        if (state.tickets) setTickets(state.tickets);
-        if (state.staff && state.staff.length > 0) {
+        if (state.tickets && Array.isArray(state.tickets)) setTickets(state.tickets);
+        if (state.staff && Array.isArray(state.staff)) {
           setStaffList(state.staff);
           try { localStorage.setItem('agency_staff_backup', JSON.stringify(state.staff)); } catch {}
         }
-        if (state.counters && state.counters.length > 0) setCounters(state.counters);
+        if (state.counters && Array.isArray(state.counters)) setCounters(state.counters);
         if (state.counterSessions) setCounterSessions(state.counterSessions);
         if (typeof state.issuancePaused === 'boolean') setIssuancePaused(state.issuancePaused);
         if (state.date) setDate(state.date);
