@@ -1,6 +1,6 @@
 {
-  "date": "2026-10-09",
-  "ticketSequence": 17,
+  "date": "2026-10-10",
+  "ticketSequence": 25,
   "issuancePaused": false,
   "settings": {
     "departmentTitle": "دائرة الوكالات – نقابة المحامين بحلب",
@@ -40,6 +40,90 @@
   },
   "tickets": [
     {
+      "id": "ticket-1791637311497-0uba",
+      "number": 25,
+      "displayNumber": "A-025",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T13:01:51.497Z"
+    },
+    {
+      "id": "ticket-1791637219692-x5h0",
+      "number": 24,
+      "displayNumber": "A-024",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T13:00:19.692Z"
+    },
+    {
+      "id": "ticket-1791637218106-r836",
+      "number": 23,
+      "displayNumber": "A-023",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T13:00:18.106Z"
+    },
+    {
+      "id": "ticket-1791637139845-qh6d",
+      "number": 22,
+      "displayNumber": "A-022",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T12:58:59.845Z"
+    },
+    {
+      "id": "ticket-1791637136385-uwf8",
+      "number": 21,
+      "displayNumber": "A-021",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T12:58:56.385Z"
+    },
+    {
+      "id": "ticket-1791636917271-1jih",
+      "number": 20,
+      "displayNumber": "B-020",
+      "category": "special",
+      "categoryNameArabic": "الحصول على صورة عن وكالة",
+      "status": "waiting",
+      "createdAt": "2026-10-10T12:55:17.271Z"
+    },
+    {
+      "id": "ticket-1791636900634-8i7m",
+      "number": 19,
+      "displayNumber": "A-019",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-10T12:55:00.634Z",
+      "calledAt": "2026-10-10T12:56:08.093Z",
+      "counterId": "counter-1",
+      "counterName": "الشباك 1 (توثيق وكالة)",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "completedAt": "2026-10-10T12:56:12.753Z"
+    },
+    {
+      "id": "ticket-1791636757489-16g3",
+      "number": 18,
+      "displayNumber": "A-018",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-10T12:52:37.489Z",
+      "calledAt": "2026-10-10T12:55:58.660Z",
+      "counterId": "counter-1",
+      "counterName": "الشباك 1 (توثيق وكالة)",
+      "staffId": "staff-1791572701221",
+      "staffName": "حسان مرشحة",
+      "completedAt": "2026-10-10T12:56:01.887Z"
+    },
+    {
       "id": "ticket-1791583826182-ybz6",
       "number": 17,
       "displayNumber": "A-017",
@@ -49,7 +133,7 @@
       "createdAt": "2026-10-09T22:10:26.182Z",
       "calledAt": "2026-10-09T22:13:19.839Z",
       "counterId": "counter-3",
-      "counterName": "الشباك 3 (توثيق وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:13:24.064Z"
@@ -64,7 +148,7 @@
       "createdAt": "2026-10-09T22:10:23.097Z",
       "calledAt": "2026-10-09T22:13:07.864Z",
       "counterId": "counter-3",
-      "counterName": "الشباك 3 (توثيق وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:13:14.964Z"
@@ -79,7 +163,7 @@
       "createdAt": "2026-10-09T22:10:20.148Z",
       "calledAt": "2026-10-09T22:13:02.639Z",
       "counterId": "counter-3",
-      "counterName": "الشباك 3 (توثيق وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:13:05.955Z"
@@ -94,7 +178,7 @@
       "createdAt": "2026-10-09T22:09:38.624Z",
       "calledAt": "2026-10-09T22:10:01.143Z",
       "counterId": "counter-2",
-      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:10:03.928Z"
@@ -109,7 +193,7 @@
       "createdAt": "2026-10-09T22:09:35.697Z",
       "calledAt": "2026-10-09T22:09:56.779Z",
       "counterId": "counter-2",
-      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:09:59.519Z"
@@ -124,7 +208,7 @@
       "createdAt": "2026-10-09T22:09:33.610Z",
       "calledAt": "2026-10-09T22:09:47.545Z",
       "counterId": "counter-2",
-      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:09:55.346Z"
@@ -157,7 +241,7 @@
       "createdAt": "2026-10-09T22:07:14.529Z",
       "calledAt": "2026-10-09T22:12:56.628Z",
       "counterId": "counter-3",
-      "counterName": "الشباك 3 (توثيق وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "completedAt": "2026-10-09T22:13:01.387Z"
@@ -195,13 +279,14 @@
       "displayNumber": "A-005",
       "category": "general",
       "categoryNameArabic": "وكالات عامة",
-      "status": "serving",
+      "status": "completed",
       "createdAt": "2026-10-09T19:06:15.944Z",
       "calledAt": "2026-10-09T19:07:17.349Z",
       "counterId": "counter-1",
       "counterName": "الشباك 1 (وكالات عامة)",
       "staffId": "staff-1791572701221",
-      "staffName": "حسان مرشحة"
+      "staffName": "حسان مرشحة",
+      "completedAt": "2026-10-10T12:55:57.228Z"
     },
     {
       "id": "ticket-1791572773478-1cqz",
@@ -284,13 +369,13 @@
     },
     {
       "id": "counter-2",
-      "name": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "name": "الشباك 5 (توثيق وكالة)",
       "isOpen": true,
       "isPaused": false
     },
     {
       "id": "counter-3",
-      "name": "الشباك 3 (توثيق وكالة)",
+      "name": "الشباك 5 (توثيق وكالة)",
       "isOpen": true,
       "isPaused": false,
       "currentStaffId": "staff-1791572724537",
@@ -299,7 +384,7 @@
     },
     {
       "id": "counter-4",
-      "name": "الشباك 4 (الاستعلامات)",
+      "name": "الشباك 5 (الحصول على صورة عن وكالة)",
       "isOpen": true,
       "isPaused": false
     }
@@ -310,7 +395,7 @@
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "counterId": "counter-3",
-      "counterName": "الشباك 3 (توثيق وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "startedAt": "2026-10-09T22:10:50.065Z"
     },
     {
@@ -318,7 +403,7 @@
       "staffId": "staff-1791572724537",
       "staffName": "زكريا ننه",
       "counterId": "counter-2",
-      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "counterName": "الشباك 5 (توثيق وكالة)",
       "startedAt": "2026-10-09T22:08:59.977Z",
       "endedAt": "2026-10-09T22:10:33.592Z"
     },
@@ -332,6 +417,158 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1791637311499-cf8v",
+      "timestamp": "2026-10-10T13:01:51.499Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-025 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791637306296-bj63",
+      "timestamp": "2026-10-10T13:01:46.296Z",
+      "action": "تعديل اسم الشباك وحفظه",
+      "details": "تم تعديل اسم الشباك من (الشباك 4 (الاستعلامات)) إلى (الشباك 5 (الحصول على صورة عن وكالة)) وحفظ التغييرات بنجاح",
+      "user": "المدير العام",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791637288854-dcpq",
+      "timestamp": "2026-10-10T13:01:28.854Z",
+      "action": "تعديل اسم الشباك وحفظه",
+      "details": "تم تعديل اسم الشباك من (الشباك 3 (توثيق وكالة)) إلى (الشباك 5 (توثيق وكالة)) وحفظ التغييرات بنجاح",
+      "user": "المدير العام",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791637280769-gawy",
+      "timestamp": "2026-10-10T13:01:20.769Z",
+      "action": "تعديل اسم الشباك وحفظه",
+      "details": "تم تعديل اسم الشباك من (الشباك 2 (الحصول على صورة عن وكالة)) إلى (الشباك 5 (توثيق وكالة)) وحفظ التغييرات بنجاح",
+      "user": "المدير العام",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791637219693-c86j",
+      "timestamp": "2026-10-10T13:00:19.693Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-024 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791637218107-gua5",
+      "timestamp": "2026-10-10T13:00:18.107Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-023 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791637198951-h20m",
+      "timestamp": "2026-10-10T12:59:58.951Z",
+      "action": "استئناف إصدار التذاكر",
+      "details": "تم استئناف إصدار التذاكر",
+      "user": "المدير العام",
+      "category": "system"
+    },
+    {
+      "id": "log-1791637196654-dboz",
+      "timestamp": "2026-10-10T12:59:56.654Z",
+      "action": "إيقاف إصدار التذاكر",
+      "details": "تم إيقاف إصدار التذاكر مؤقتاً",
+      "user": "المدير العام",
+      "category": "system"
+    },
+    {
+      "id": "log-1791637139846-jof8",
+      "timestamp": "2026-10-10T12:58:59.846Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-022 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791637136387-o2mo",
+      "timestamp": "2026-10-10T12:58:56.387Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-021 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636972754-rtb8",
+      "timestamp": "2026-10-10T12:56:12.754Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-019 بنجاح على الشباك 1 (توثيق وكالة)",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636968094-4hip",
+      "timestamp": "2026-10-10T12:56:08.094Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف حسان مرشحة على الشباك 1 (توثيق وكالة) استدعى التذكرة A-019",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636961889-tugh",
+      "timestamp": "2026-10-10T12:56:01.889Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-018 بنجاح على الشباك 1 (توثيق وكالة)",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636958661-c6fe",
+      "timestamp": "2026-10-10T12:55:58.661Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف حسان مرشحة على الشباك 1 (توثيق وكالة) استدعى التذكرة A-018",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636957229-soip",
+      "timestamp": "2026-10-10T12:55:57.229Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-005 بنجاح على الشباك 1 (وكالات عامة)",
+      "user": "حسان مرشحة",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636917272-pgba",
+      "timestamp": "2026-10-10T12:55:17.272Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم B-020 (الحصول على صورة عن وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636900636-lwe4",
+      "timestamp": "2026-10-10T12:55:00.636Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-019 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636757491-779e",
+      "timestamp": "2026-10-10T12:52:37.491Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-018 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791636292870-hsei",
+      "timestamp": "2026-10-10T12:44:52.870Z",
+      "action": "تسجيل دخول المدير",
+      "details": "تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة",
+      "user": "المدير العام",
+      "category": "auth"
+    },
     {
       "id": "log-1791584004065-lcbf",
       "timestamp": "2026-10-09T22:13:24.065Z",
@@ -858,6 +1095,7 @@
     "admin-token-1791572554981-cc2332cce9fb9882f2ccf115ad5605c5",
     "admin-token-1791571795856-458dc87fcf78b97a9592f2ec8057da0f",
     "admin-token-new-session-test",
-    "admin-token-1791583873309-f5a5076de104188fe5678b237e1fb91f"
+    "admin-token-1791583873309-f5a5076de104188fe5678b237e1fb91f",
+    "admin-token-1791636292870-287e80adc6d3b1d1b9bd607d170ecee7"
   ]
 }

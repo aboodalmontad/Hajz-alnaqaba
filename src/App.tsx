@@ -314,6 +314,7 @@ export default function App() {
             staffList={staffList}
             counters={counters}
             tickets={tickets}
+            categories={settings.categories}
             onCallNext={handleCallNext}
             onRecall={handleRecall}
             onComplete={handleComplete}
@@ -338,6 +339,7 @@ export default function App() {
             port={port}
             serverAppUrl={serverAppUrl}
             onRefreshState={fetchState}
+            onNavigate={handleNavigate}
           />
         )}
       </main>

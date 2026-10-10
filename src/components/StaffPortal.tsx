@@ -27,12 +27,13 @@ import {
   X,
   Home
 } from 'lucide-react';
-import { Staff, Counter, Ticket } from '../types';
+import { Staff, Counter, Ticket, CategoryConfig } from '../types';
 
 interface StaffPortalProps {
   staffList: Staff[];
   counters: Counter[];
   tickets: Ticket[];
+  categories?: CategoryConfig[];
   onCallNext: (staffId: string, counterId: string) => Promise<any>;
   onRecall: (ticketId: string, staffId: string) => Promise<any>;
   onComplete: (ticketId: string, staffId: string) => Promise<any>;
@@ -46,6 +47,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   staffList,
   counters,
   tickets,
+  categories = [],
   onCallNext,
   onRecall,
   onComplete,
@@ -55,10 +57,34 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   departmentTitle
 }) => {
   // Login form state
-  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [selectedStaffId, setSelectedStaffId] = useState(() => localStorage.getItem('saved_staff_id') || '');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
   const [pin, setPin] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('remember_me') === 'true');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // Sync search input with selected staff when a selection is made
+  useEffect(() => {
+    if (selectedStaffId && staffList.length > 0) {
+      const staff = staffList.find(s => s.id === selectedStaffId);
+      if (staff) {
+        setStaffSearch(staff.name);
+      } else {
+        // Staff no longer exists, clear the invalid saved ID
+        setSelectedStaffId('');
+        localStorage.removeItem('saved_staff_id');
+        setStaffSearch('');
+      }
+    }
+  }, [selectedStaffId, staffList]);
+
+  // Filtered staff list
+  const filteredStaff = staffList.filter(s => 
+    s.role === 'staff' && 
+    (s.name.toLowerCase().includes(staffSearch.toLowerCase()) || s.jobTitle?.toLowerCase().includes(staffSearch.toLowerCase()))
+  );
 
   // Authenticated staff state
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(() => {
@@ -66,10 +92,13 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [showCounterSelection, setShowCounterSelection] = useState(false);
+
   // Selected counter for claim screen
   const [selectedCounterId, setSelectedCounterId] = useState<string>('');
   const [counterClaimError, setCounterClaimError] = useState('');
   const [counterClaimLoading, setCounterClaimLoading] = useState(false);
+  const [previewCounter, setPreviewCounter] = useState<Counter | null>(null);
 
   // Active desk modal states
   const [skipModal, setSkipModal] = useState(false);
@@ -121,6 +150,18 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
 
       setCurrentStaff(data.staff);
       sessionStorage.setItem('agency_current_staff', JSON.stringify(data.staff));
+      
+      setShowCounterSelection(true);
+
+      // Handle Remember Me
+      if (rememberMe) {
+        localStorage.setItem('remember_me', 'true');
+        localStorage.setItem('saved_staff_id', selectedStaffId);
+      } else {
+        localStorage.removeItem('remember_me');
+        localStorage.removeItem('saved_staff_id');
+      }
+      
       setPin('');
       showToast('success', `مرحباً بك يا زميل ${data.staff.name}`);
     } catch (err: any) {
@@ -171,6 +212,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
       const updatedStaff = { ...currentStaff, counterId: data.counter.id };
       setCurrentStaff(updatedStaff);
       sessionStorage.setItem('agency_current_staff', JSON.stringify(updatedStaff));
+      setShowCounterSelection(false);
 
       showToast('success', data.message || 'تم حجز الشباك بنجاح، يمكنك بدء العمل.');
     } catch (err: any) {
@@ -335,19 +377,45 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">اختر اسم الموظف / المندوب:</label>
-              <select
-                value={selectedStaffId}
-                onChange={e => setSelectedStaffId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
-                required
-              >
-                <option value="">-- اضغط للاختيار --</option>
-                {staffList.filter(s => s.role === 'staff').map(s => (
-                  <option key={s.id} value={s.id} disabled={!s.active}>
-                    {s.name} ({s.jobTitle || 'مندوب وكالات'}) {!s.active ? ' [موقف إدارياً]' : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="ابحث عن اسم الموظف..."
+                  value={staffSearch}
+                  onChange={(e) => {
+                    setStaffSearch(e.target.value);
+                    setIsStaffDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsStaffDropdownOpen(true)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+                />
+                
+                {isStaffDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto">
+                    {filteredStaff.length > 0 ? (
+                      filteredStaff.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedStaffId(s.id);
+                            setStaffSearch(s.name);
+                            setIsStaffDropdownOpen(false);
+                          }}
+                          className={`w-full text-right px-4 py-3 text-sm hover:bg-amber-50 ${
+                            s.id === selectedStaffId ? 'bg-amber-100 font-bold' : ''
+                          }`}
+                          disabled={!s.active}
+                        >
+                          {s.name} ({s.jobTitle || 'مندوب وكالات'}) {!s.active ? ' [موقف إدارياً]' : ''}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500">لا يوجد موظف بهذا الاسم</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -366,6 +434,16 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
               </div>
             </div>
 
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-xs font-medium text-slate-600">حفظ بيانات الدخول</span>
+            </label>
+
             <button
               type="submit"
               disabled={loginLoading}
@@ -380,7 +458,8 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   }
 
   // Find if current staff is currently claiming a counter
-  const activeCounter = counters.find(c => c.currentStaffId === currentStaff.id);
+  const existingCounter = currentStaff ? counters.find(c => c.currentStaffId === currentStaff.id) : null;
+  const activeCounter = !showCounterSelection ? existingCounter : null;
   const waitingTickets = tickets.filter(t => t.status === 'waiting');
   const myServingTicket = tickets.find(t => t.staffId === currentStaff.id && t.status === 'serving');
 
@@ -480,7 +559,10 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                 <div
                   key={counter.id}
                   onClick={() => {
-                    if (isAvailable) setSelectedCounterId(counter.id);
+                    if (isAvailable) {
+                      setSelectedCounterId(counter.id);
+                      setPreviewCounter(counter);
+                    }
                   }}
                   className={`p-5 rounded-2xl border-2 transition-all flex flex-col justify-between gap-4 select-none ${
                     !isAvailable 
@@ -490,7 +572,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                         : 'border-slate-200 bg-white hover:border-slate-300 shadow-sm cursor-pointer'
                   }`}
                 >
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900 text-sm">{counter.name}</span>
                       {isSelected && isAvailable && (
@@ -504,11 +586,25 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                         {statusBadge.text}
                       </span>
                     </div>
+                    {counter.assignedServiceName && (
+                      <div className="text-xs text-amber-900 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                        الاختصاص: {counter.assignedServiceName}
+                      </div>
+                    )}
+                    {(() => {
+                      const assignedCat = categories?.find(c => c.id === counter.assignedServiceId) || 
+                                         categories?.find(c => counter.assignedServiceName && c.name.includes(counter.assignedServiceName));
+                      return assignedCat?.desc ? (
+                        <div className="text-[10px] text-slate-600 mt-1.5 leading-tight line-clamp-2 italic">
+                          {assignedCat.desc}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
 
                   {isAvailable && (
-                    <div className="text-[11px] text-slate-500 font-medium">
-                      اضغط لتحديد هذا الشباك
+                    <div className="text-[11px] text-amber-600 font-bold flex items-center gap-1">
+                      <span>اضغط لمعاينة الاختصاص والمهام والدخول</span>
                     </div>
                   )}
                 </div>
@@ -520,7 +616,8 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
           <div className="pt-2">
             <button
               onClick={() => {
-                if (selectedCounterId) handleClaimCounter(selectedCounterId);
+                const c = counters.find(x => x.id === selectedCounterId);
+                if (c) setPreviewCounter(c);
               }}
               disabled={!selectedCounterId || counterClaimLoading}
               className={`w-full py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 ${
@@ -530,11 +627,87 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
               }`}
             >
               <UserCheck className="w-5 h-5" />
-              {counterClaimLoading ? 'جارِ حجز الشباك...' : 'بدء العمل على هذا الشباك'}
+              {counterClaimLoading ? 'جارِ حجز الشباك...' : 'معاينة اختصاص ومهام الشباك والدخول'}
             </button>
           </div>
 
         </div>
+
+        {/* MODAL: SPECIALTY & TASKS PREVIEW BEFORE ENTRY */}
+        {previewCounter && (() => {
+          const assignedCat = categories?.find(c => c.id === previewCounter.assignedServiceId) || 
+                             categories?.find(c => previewCounter.assignedServiceName && c.name.includes(previewCounter.assignedServiceName)) ||
+                             categories?.[0];
+
+          return (
+            <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-amber-200 space-y-6 text-right">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center font-black">
+                      <Building2 className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900">اختصاص ومهام الشباك قبل الدخول</h3>
+                      <p className="text-xs text-amber-700 font-bold">{previewCounter.name}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setPreviewCounter(null)}
+                    className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">الخدمة والاختصاص الرئيسي</span>
+                    <div className="text-base font-black text-slate-900 flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-amber-600"></span>
+                      {previewCounter.assignedServiceName || assignedCat?.name || 'الخدمة العامة للوكالات'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pt-2 border-t border-slate-200">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">مهام الشباك والتفاصيل</span>
+                    <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                      {assignedCat?.desc || 'استقبال المراجعين وتدقيق وتنفيذ المعاملات القانونية الخاصة بهذا الشباك وفقاً للأصول المعمول بها في نقابة المحامين.'}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 font-semibold flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <span>
+                      عند دخولك هذا الشباك، سيقوم النظام تلقائياً بتوجيه واستدعاء التذاكر الخاصة بهذه الخدمة حصرياً إلى شباكك.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      const cId = previewCounter.id;
+                      setPreviewCounter(null);
+                      handleClaimCounter(cId);
+                    }}
+                    disabled={counterClaimLoading}
+                    className="flex-1 py-4 bg-amber-600 hover:bg-amber-500 text-white font-black rounded-2xl shadow-lg transition-all text-sm flex items-center justify-center gap-2 active:scale-98"
+                  >
+                    <Check className="w-5 h-5" />
+                    {counterClaimLoading ? 'جارِ الدخول...' : 'تأكيد الدخول والمباشرة على الشباك'}
+                  </button>
+                  <button
+                    onClick={() => setPreviewCounter(null)}
+                    className="px-5 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-sm transition-colors"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     );
@@ -544,6 +717,9 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   // VIEW 3: ACTIVE QUEUE & DESK MANAGEMENT (واجهة المندوب النشطة)
   // ==============================================================
   const isCounterPaused = activeCounter.isPaused;
+
+  const assignedCat = categories?.find(c => c.id === activeCounter.assignedServiceId) || 
+                     categories?.find(c => activeCounter.assignedServiceName && c.name.includes(activeCounter.assignedServiceName));
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -573,7 +749,14 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
                 {isCounterPaused ? 'متوقف مؤقتاً (استراحة)' : 'يعمل بنشاط'}
               </span>
             </div>
-            <div className="text-xs text-amber-400 font-semibold">{activeCounter.name}</div>
+            <div className="text-xs text-amber-400 font-semibold">
+              {activeCounter.name} {activeCounter.assignedServiceName ? `| اختصاص: ${activeCounter.assignedServiceName}` : ''}
+            </div>
+            {assignedCat?.desc && (
+              <div className="text-[10px] text-slate-300 mt-0.5 italic max-w-sm">
+                مهام الشباك: {assignedCat.desc}
+              </div>
+            )}
           </div>
         </div>
 

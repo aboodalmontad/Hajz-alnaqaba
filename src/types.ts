@@ -21,8 +21,6 @@ export interface Ticket {
   notes?: string;
 }
 
-export type TicketType = Ticket;
-
 export interface Staff {
   id: string;
   name: string;
@@ -42,6 +40,8 @@ export interface Counter {
   currentStaffId?: string;
   currentStaffName?: string;
   claimedAt?: string;
+  assignedServiceId?: string;
+  assignedServiceName?: string;
 }
 
 export interface CounterSession {
@@ -59,6 +59,9 @@ export interface CategoryConfig {
   prefix: string;
   name: string;
   desc: string;
+  active?: boolean;
+  assignedCounterId?: string;
+  assignedCounterName?: string;
 }
 
 export interface SystemSettings {

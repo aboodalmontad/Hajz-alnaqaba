@@ -43,10 +43,12 @@ import {
   EyeOff,
   Database,
   Tag,
-  Sparkles
+  Sparkles,
+  Ticket,
+  Save
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
+import type { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
 import { Kiosk } from './Kiosk';
 
@@ -63,6 +65,7 @@ interface AdminDashboardProps {
   port?: number;
   serverAppUrl?: string;
   onRefreshState: () => void;
+  onNavigate?: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -77,7 +80,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   localIPs = ['127.0.0.1'],
   port = 3000,
   serverAppUrl,
-  onRefreshState
+  onRefreshState,
+  onNavigate
 }) => {
   // Auth state
   const [adminToken, setAdminToken] = useState<string | null>(() => {
@@ -90,6 +94,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Tab state
   const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs' | 'issuance_control'>('issuance_control');
   const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts' | 'categories' | 'database'>('counters');
+
+  const getNextServicePrefix = (categories: CategoryConfig[] = []) => {
+    const existingPrefixes = categories.map(c => c.prefix?.toUpperCase() || '');
+    for (let i = 65; i <= 90; i++) { // A to Z
+      const char = String.fromCharCode(i);
+      if (!existingPrefixes.includes(char)) {
+        return char;
+      }
+    }
+    return 'Z';
+  };
 
   // Agent QR URL calculation
   const baseUrl = resolveBaseUrl(localIPs, port, serverAppUrl);
@@ -145,6 +160,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingCounter, setEditingCounter] = useState<Counter | null>(null);
   const [counterFormName, setCounterFormName] = useState('');
   const [counterFormOpen, setCounterFormOpen] = useState(true);
+  const [counterFormServiceId, setCounterFormServiceId] = useState('');
   const [showAddCounterModal, setShowAddCounterModal] = useState(false);
   const [recentlyEditedCounterId, setRecentlyEditedCounterId] = useState<string | null>(null);
 
@@ -658,7 +674,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleDeleteTicket = (ticket: Ticket) => {
+  const handleDeleteTicket = (ticket: TicketType) => {
     setConfirmModal({
       title: 'حذف تذكرة دور نهائياً',
       message: `هل أنت متأكد من حذف التذكرة رقم ${ticket.displayNumber} نهائياً؟ هذا الإجراء لا يمكن التراجع عنه وسيسجل في سجل التدقيق.`,
@@ -677,6 +693,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ----------------------------------------------------
   // COUNTER ACTIONS
   // ----------------------------------------------------
+  const handleQuickAssignService = async (counterId: string, catId: string) => {
+    try {
+      await adminFetch(`/api/admin/counters/${counterId}/assign-service`, {
+        method: 'POST',
+        body: JSON.stringify({ serviceId: catId })
+      });
+      onRefreshState();
+      showToast('success', 'تم تحديث الخدمة المقدمة من الشباك بنجاح.');
+    } catch (err: any) {
+      showToast('error', err.message || 'حدث خطأ أثناء تحديث الخدمة للشباك.');
+    }
+  };
+
+  const handleQuickAssignStaff = async (counterId: string, staffId: string) => {
+    try {
+      const data = await adminFetch(`/api/admin/counters/${counterId}/assign-staff`, {
+        method: 'POST',
+        body: JSON.stringify({ staffId })
+      });
+      onRefreshState();
+      showToast('success', data.message || 'تم تحديث المندوب للشباك بنجاح.');
+    } catch (err: any) {
+      showToast('error', err.message || 'حدث خطأ أثناء تحديث المندوب للشباك.');
+    }
+  };
+
   const handleSaveCounter = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = counterFormName.trim();
@@ -686,9 +728,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     try {
+      let savedCounterId = '';
       if (editingCounter) {
         const editedId = editingCounter.id;
-        const data = await adminFetch('/api/admin/counters', {
+        await adminFetch('/api/admin/counters', {
           method: 'POST',
           body: JSON.stringify({
             id: editedId,
@@ -696,13 +739,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             isOpen: counterFormOpen
           })
         });
+        savedCounterId = editedId;
         setEditingCounter(null);
         setShowAddCounterModal(false);
         setRecentlyEditedCounterId(editedId);
         setTimeout(() => setRecentlyEditedCounterId(null), 5000);
-        showToast('success', `تم حفظ التعديل: تم تغيير اسم الشباك إلى "${trimmedName}" بنجاح.`);
+        showToast('success', `تم حفظ التعديل: تم تحديث الشباك "${trimmedName}" بنجاح.`);
       } else {
-        const data = await adminFetch('/api/admin/counters', {
+        await adminFetch('/api/admin/counters', {
           method: 'POST',
           body: JSON.stringify({
             name: trimmedName,
@@ -712,7 +756,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setShowAddCounterModal(false);
         showToast('success', `تم حفظ الشباك الجديد: تمت إضافة "${trimmedName}" بنجاح.`);
       }
+
+      const targetCounterId = savedCounterId || (counters.length > 0 ? counters[counters.length - 1].id : '');
+      if (targetCounterId && counterFormServiceId !== undefined) {
+        await handleQuickAssignService(targetCounterId, counterFormServiceId);
+      }
+
       setCounterFormName('');
+      setCounterFormServiceId('');
       onRefreshState();
     } catch (err: any) {
       showToast('error', err.message || 'حدث خطأ أثناء حفظ الشباك.');
@@ -944,6 +995,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return true;
   });
 
+  // Extract counter missions and definitions dynamically for service assignment
+  const counterMissions = counters.map(counter => {
+    const match = counter.name.match(/\((.*?)\)/);
+    const task = match ? match[1].trim() : counter.name.replace(/^الشباك\s*\d+\s*[-:]?\s*/, '').trim();
+    return {
+      counterId: counter.id,
+      counterName: counter.name,
+      task: task || counter.name
+    };
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       
@@ -995,17 +1057,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Removed button */}
+          
           <button
             onClick={handleToggleIssuance}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-sm ${
               issuancePaused 
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                : 'bg-amber-600 hover:bg-amber-500 text-white'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
             }`}
           >
             {issuancePaused ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
             {issuancePaused ? 'استئناف إصدار التذاكر' : 'إيقاف إصدار التذاكر مؤقتاً'}
           </button>
+
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('kiosk')}
+              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all"
+              title="فتح جهاز إصدار الدور بملء الشاشة للمراجعين"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+              <span>جهاز الإصدار للمراجعين</span>
+            </button>
+          )}
 
           <button
             onClick={handleNewDay}
@@ -1078,12 +1153,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onClick={() => setActiveTab('issuance_control')}
           className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'issuance_control' 
-              ? 'bg-amber-600 text-white shadow-md' 
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/30' 
+              : 'text-slate-800 hover:bg-slate-100 bg-amber-50/70 border border-amber-200/70'
           }`}
         >
-          <Ticket className="w-4 h-4" />
-          لوحة تحكم إصدار الدور (Kiosk)
+          <Ticket className="w-4 h-4 text-amber-500" />
+          <span>لوحة التحكم الخاصة بإصدار الدور</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            activeTab === 'issuance_control' ? 'bg-slate-900 text-white' : 'bg-amber-200 text-amber-900'
+          }`}>
+            {issuancePaused ? 'متوقف' : 'جاهز'}
+          </span>
         </button>
 
         <button
@@ -1137,28 +1217,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* SUBTAB: ISSUANCE CONTROL (KIOSK) */}
       {activeTab === 'issuance_control' && (
-        <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200">
-          <Kiosk
-            issuancePaused={issuancePaused}
-            waitingCount={tickets.filter(t => t.status === 'waiting').length}
-            categories={settings.categories}
-            departmentTitle={settings.departmentTitle}
-            counters={counters}
-            onRefreshState={onRefreshState}
-            onIssueTicket={async (category) => {
-              try {
-                const data = await adminFetch('/api/tickets', {
-                  method: 'POST',
-                  body: JSON.stringify({ category })
-                });
-                onRefreshState();
-                return data.ticket;
-              } catch (err) {
-                console.error('Error issuing ticket', err);
-                return null;
-              }
-            }}
-          />
+        <div id="issuance-control-section" className="space-y-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                <Ticket className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">لوحة التحكم الخاصة بإصدار تذاكر الدور</h3>
+                <p className="text-xs text-slate-500">
+                  لوحة تفاعلية متكاملة للمدير العام تتيح إصدار التذاكر فوراً ومتابعة مراجعي الدور وحالة النظام
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleToggleIssuance}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+                  issuancePaused 
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-white'
+                }`}
+              >
+                {issuancePaused ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
+                {issuancePaused ? 'استئناف إصدار التذاكر' : 'إيقاف إصدار التذاكر مؤقتاً'}
+              </button>
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate('kiosk')}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  عرض شاشة جهاز الإصدار للمراجعين
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200">
+            <Kiosk
+              issuancePaused={issuancePaused}
+              waitingCount={tickets.filter(t => t.status === 'waiting').length}
+              categories={settings.categories}
+              departmentTitle={settings.departmentTitle}
+              counters={counters}
+              onRefreshState={onRefreshState}
+              onIssueTicket={async (category) => {
+                try {
+                  const data = await adminFetch('/api/tickets', {
+                    method: 'POST',
+                    body: JSON.stringify({ category })
+                  });
+                  onRefreshState();
+                  return data.ticket;
+                } catch (err) {
+                  console.error('Error issuing ticket', err);
+                  return null;
+                }
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -1177,6 +1295,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}
             >
               <span>حالة الشبابيك ومندوبيها ({counters.length})</span>
+            </button>
+            <button
+              onClick={() => setDataSubTab('categories')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                dataSubTab === 'categories' ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-400/30' : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>إدارة وتعديل الخدمات ({settings?.categories?.length || 0})</span>
             </button>
             <button
               onClick={() => setDataSubTab('tickets')}
@@ -1226,8 +1353,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   onClick={() => {
                     setEditingCounter(null);
-                    setCounterFormName('');
+                    setCounterFormName(`الشباك ${counters.length + 1}`);
                     setCounterFormOpen(true);
+                    setCounterFormServiceId('');
                     setShowAddCounterModal(true);
                   }}
                   className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm"
@@ -1294,6 +1422,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                           )}
                         </div>
+
+                        {/* Quick Service Assignment Dropdown on Counter Card */}
+                        <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-amber-950">
+                            <span className="flex items-center gap-1">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                              الخدمة المقدمة (تغيير فوري):
+                            </span>
+                          </div>
+                          {(() => {
+                            const assignedServiceId = counter.assignedServiceId || (settings?.categories || []).find(cat => cat.assignedCounterId === counter.id)?.id || '';
+                            return (
+                              <select
+                                value={assignedServiceId}
+                                onChange={(e) => handleQuickAssignService(counter.id, e.target.value)}
+                                className="w-full bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                              >
+                                <option value="">-- بدون خدمة مخصصة (عامة) --</option>
+                                {(settings?.categories || []).map(cat => (
+                                  <option key={cat.id} value={cat.id}>
+                                    {cat.name} ({cat.prefix})
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Quick Staff / Representative Assignment Dropdown on Counter Card */}
+                        <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-blue-950">
+                            <span className="flex items-center gap-1">
+                              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                              المندوب / الموظف (تغيير فوري):
+                            </span>
+                          </div>
+                          <select
+                            value={counter.currentStaffId || ''}
+                            onChange={(e) => handleQuickAssignStaff(counter.id, e.target.value)}
+                            className="w-full bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="">-- بدون مندوب (متاح للاستلام) --</option>
+                            {staffList.map(st => (
+                              <option key={st.id} value={st.id}>
+                                {st.name} ({st.jobTitle || 'مندوب'}) {st.counterId && st.counterId !== counter.id ? '(شاغل شباك آخر)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
                       {/* Administrative Desk Actions */}
@@ -1327,6 +1504,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               setEditingCounter(counter);
                               setCounterFormName(counter.name);
                               setCounterFormOpen(counter.isOpen);
+                              const assignedCat = (settings?.categories || []).find(cat => cat.assignedCounterId === counter.id);
+                              setCounterFormServiceId(assignedCat ? assignedCat.id : '');
                               setShowAddCounterModal(true);
                             }}
                             className="flex-1 py-2 bg-slate-200 hover:bg-amber-100 hover:text-amber-900 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
@@ -1360,6 +1539,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-xs text-slate-500">إمكانية إضافة تذاكر يدوياً، تعديل الحالة، إعادة النداء، نقل الدور، أو الحذف والتصفير الشامل</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setActiveTab('issuance_control')}
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Ticket className="w-4 h-4 text-amber-400" /> لوحة التحكم الخاصة بإصدار الدور
+                  </button>
                   <button
                     onClick={() => {
                       setTicketFormCategory(settings?.categories?.[0]?.id || 'general');
@@ -1764,10 +1949,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <button
                   onClick={() => {
+                    const nextPrefix = getNextServicePrefix(settings?.categories);
                     setEditingCategory(null);
-                    setCategoryFormId('');
+                    setCategoryFormId(`service_${nextPrefix.toLowerCase()}`);
                     setCategoryFormName('');
-                    setCategoryFormPrefix('');
+                    setCategoryFormPrefix(nextPrefix);
                     setCategoryFormDesc('');
                     setShowCategoryModal(true);
                   }}
@@ -1780,8 +1966,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {(settings?.categories || []).map(cat => {
                   const catTicketsCount = tickets.filter(t => t.category === cat.id).length;
+
                   return (
-                    <div key={cat.id} className="p-5 rounded-2xl border-2 border-slate-200 bg-slate-50 hover:border-amber-400 transition-all flex flex-col justify-between space-y-4">
+                    <div key={cat.id} className="p-5 rounded-2xl border-2 border-slate-200 bg-slate-50 hover:border-amber-400 transition-all flex flex-col justify-between space-y-4 shadow-xs">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="w-9 h-9 rounded-xl bg-amber-600 text-white font-black font-mono text-base flex items-center justify-center shadow-sm">
@@ -1795,6 +1982,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <h4 className="font-bold text-slate-900 text-sm">{cat.name}</h4>
                           <p className="text-xs text-slate-500 mt-1 line-clamp-2">{cat.desc || 'لا يوجد وصف محدد'}</p>
                         </div>
+
                         <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-xs flex items-center justify-between font-medium">
                           <span className="text-slate-500">تذاكر اليوم المصدرة:</span>
                           <strong className="text-amber-700 font-mono font-bold">{catTicketsCount} تذكرة</strong>
@@ -1813,7 +2001,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           }}
                           className="flex-1 py-2 bg-slate-200 hover:bg-amber-100 hover:text-amber-900 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                         >
-                          <Edit3 className="w-3.5 h-3.5" /> تعديل وحفظ
+                          <Edit3 className="w-3.5 h-3.5" /> تعديل وحفظ الخدمة
                         </button>
                         <button
                           onClick={() => handleDeleteCategory(cat)}
@@ -2432,21 +2620,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <form onSubmit={handleSaveCounter} className="space-y-4">
               {/* Service Matching Selection */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">تحديد الخدمة المخصصة لهذا الشباك:</label>
-                <select
+                <label className="text-xs font-bold text-slate-700">اسم ورقم الشباك:</label>
+                <input
+                  type="text"
                   value={counterFormName}
                   onChange={e => setCounterFormName(e.target.value)}
+                  placeholder="مثال: الشباك 1 أو الشباك 5 (توثيق وكالة)"
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   required
-                >
-                  <option value="">-- اختر الخدمة المخصصة لهذا الشباك --</option>
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-500 w-full">إدراج خدمة مقترحة في اسم الشباك:</span>
                   {settings?.categories?.map(cat => (
-                    <option key={cat.id} value={`الشباك ${counters.length + 1} (${cat.name})`}>
-                      {cat.name}
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        const baseName = counterFormName.replace(/\s*\(.*\)$/, '').trim();
+                        setCounterFormName(`${baseName || 'الشباك'} (${cat.name})`);
+                      }}
+                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-medium transition-colors"
+                    >
+                      + {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Service Assignment Dropdown in Counter Modal */}
+              <div className="space-y-1.5 p-3.5 bg-amber-50/80 border-2 border-amber-200 rounded-2xl">
+                <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  الخدمة المقدمة من هذا الشباك (قائمة منسدلة):
+                </label>
+                <select
+                  value={counterFormServiceId}
+                  onChange={(e) => setCounterFormServiceId(e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- بدون خدمة مخصصة (عامة) --</option>
+                  {(settings?.categories || []).map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name} ({cat.prefix})
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-slate-500">سيتم تلقائياً تعيين الخدمة المختارة لهذا الشباك</p>
+                <p className="text-[11px] text-amber-800 leading-tight font-medium">
+                  يسمح للمدير بتحديد الخدمة التي يقدمها الشباك بشكل فوري وسريع لربطها بلوحة إصدار الدور.
+                </p>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -2783,63 +3004,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <form onSubmit={handleSaveCategory} className="space-y-4">
-              {/* Quick Matching from Existing Counters */}
-              {counters && counters.length > 0 && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-amber-600" />
-                    اقتباس ومطابقة اسم الخدمة مع أحد الشبابيك الحالية:
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {counters.map(counter => {
-                      const match = counter.name.match(/\((.*?)\)/);
-                      const cleanName = match ? match[1] : counter.name.replace(/^الشباك\s*\d+\s*/, '');
-                      return (
-                        <button
-                          key={counter.id}
-                          type="button"
-                          onClick={() => {
-                            setCategoryFormName(cleanName);
-                            if (!categoryFormDesc) {
-                              setCategoryFormDesc(`تنجز هذه المعاملة لدى ${counter.name}`);
-                            }
-                          }}
-                          className="px-2.5 py-1 bg-white hover:bg-amber-100 text-slate-800 hover:text-amber-900 rounded-lg text-xs font-medium border border-slate-200 transition-colors shadow-xs"
-                        >
-                          {counter.name} &larr; <strong className="text-amber-700">{cleanName}</strong>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Suggested Names */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">نماذج خدمات شائعة بنقرة واحدة:</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { name: 'توثيق وكالة', desc: 'تنظيم وتوثيق الوكالات العامة والخاصة وتثبيتها أصولاً' },
-                    { name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة' },
-                    { name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع والفراغ وإدارة الأملاك والمركبات' },
-                    { name: 'تصديق العقود والاتفاقيات', desc: 'تصديق وتثبيت العقود والاتفاقيات القانونية' },
-                    { name: 'الاستعلامات والدعم النقابي', desc: 'الاستعلام عن الأوراق المطلوبة والرسوم النقابية' }
-                  ].map(preset => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => {
-                        setCategoryFormName(preset.name);
-                        setCategoryFormDesc(preset.desc);
-                      }}
-                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-xs font-bold border border-amber-200 transition-colors"
-                    >
-                      + {preset.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">اسم الخدمة في جهاز الإصدار (Kiosk): <span className="text-red-500">*</span></label>
                 <input
@@ -2851,6 +3015,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   required
                 />
               </div>
+
+
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -2895,10 +3061,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
-                  <CheckCircle className="w-4 h-4" />
-                  {editingCategory ? 'حفظ تعديلات الفئة' : 'إضافة وحفظ الفئة'}
+                  <Save className="w-4 h-4" />
+                  {editingCategory ? 'حفظ وتعديل الخدمة' : 'إضافة وحفظ الخدمة'}
                 </button>
                 <button
                   type="button"

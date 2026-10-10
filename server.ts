@@ -106,6 +106,8 @@ interface Counter {
   currentStaffId?: string;
   currentStaffName?: string;
   claimedAt?: string;
+  assignedServiceId?: string;
+  assignedServiceName?: string;
 }
 
 interface CounterSession {
@@ -123,6 +125,9 @@ interface CategoryConfig {
   prefix: string;
   name: string;
   desc: string;
+  active?: boolean;
+  assignedCounterId?: string;
+  assignedCounterName?: string;
 }
 
 interface SystemSettings {
@@ -724,7 +729,9 @@ app.post('/api/tickets', (req, res) => {
     id: category,
     prefix: 'A',
     name: 'وكالات عامة',
-    desc: ''
+    desc: '',
+    assignedCounterId: undefined,
+    assignedCounterName: undefined
   };
 
   const newTicket: Ticket = {
@@ -733,6 +740,8 @@ app.post('/api/tickets', (req, res) => {
     displayNumber: `${catConfig.prefix}-${paddedNum}`,
     category: catConfig.id,
     categoryNameArabic: catConfig.name,
+    counterId: catConfig.assignedCounterId,
+    counterName: catConfig.assignedCounterName,
     status: 'waiting',
     createdAt: new Date().toISOString()
   };
@@ -776,23 +785,57 @@ app.post('/api/staff/call-next', (req, res) => {
     return res.status(400).json({ error: 'لديك مراجع قيد الخدمة حاليًا. يرجى إنهاء الخدمة أو تجاوز الدور أولاً.' });
   }
 
-  // Find oldest waiting ticket (FIFO) atomically
-  // Restrict to tickets whose category matches the service indicated in the counter name
-  // Counter names are structured like: "الشباك 1 (اسم الخدمة)"
+  // Find oldest waiting ticket (FIFO) atomically:
+  // 1. Check for tickets with categories explicitly assigned to this counter
+  // 2. Or tickets where counterId was pre-assigned to this counter
+  // 3. Or matching by service name in counter name (e.g. "الشباك 1 (توثيق وكالة)")
+  // 4. Or general FIFO waiting ticket
+  // Collect all allowed category IDs for this counter:
+  const allowedCatIdsSet = new Set<string>();
+
+  if (counter.assignedServiceId) {
+    allowedCatIdsSet.add(counter.assignedServiceId);
+  }
+
+  db.settings.categories.forEach(cat => {
+    if (cat.assignedCounterId === counter.id) {
+      allowedCatIdsSet.add(cat.id);
+    }
+  });
+
   const counterServiceMatch = counter.name.match(/\((.*?)\)/);
-  const counterService = counterServiceMatch ? counterServiceMatch[1] : null;
+  const counterService = counter.assignedServiceName || (counterServiceMatch ? counterServiceMatch[1].trim() : null);
+  if (counterService) {
+    db.settings.categories.forEach(cat => {
+      if (cat.name === counterService || cat.id === counterService) {
+        allowedCatIdsSet.add(cat.id);
+      }
+    });
+  }
+
+  // Also check if any counter has assignedServiceId matching category
+  db.settings.categories.forEach(cat => {
+    const matchingCounters = db.counters.filter(c => c.assignedServiceId === cat.id);
+    if (matchingCounters.some(c => c.id === counter.id)) {
+      allowedCatIdsSet.add(cat.id);
+    }
+  });
+
+  const allowedCatIds = Array.from(allowedCatIdsSet);
 
   let nextTicket = null;
-  if (counterService) {
-    // Try to find a waiting ticket that matches the counter's service name
-    nextTicket = db.tickets.slice().reverse().find(t => t.status === 'waiting' && t.categoryNameArabic === counterService);
+
+  if (allowedCatIds.length > 0) {
+    nextTicket = db.tickets.slice().reverse().find(t => 
+      t.status === 'waiting' && (allowedCatIds.includes(t.category) || t.counterId === counter.id)
+    );
   } else {
-    // Fallback to any waiting ticket if no service match found in counter name
     nextTicket = db.tickets.slice().reverse().find(t => t.status === 'waiting');
   }
 
   if (!nextTicket) {
-    return res.status(404).json({ error: `لا توجد تذاكر في قائمة الانتظار لهذا الشباك ${counterService ? `(${counterService})` : 'حالياً'}.` });
+    const serviceName = counter.assignedServiceName || (counterServiceMatch ? counterServiceMatch[1] : 'المخصصة');
+    return res.status(404).json({ error: `لا توجد تذاكر في قائمة الانتظار للخدمة (${serviceName}) الخاصة بهذا الشباك.` });
   }
 
   nextTicket.status = 'serving';
@@ -1166,6 +1209,111 @@ app.post('/api/admin/move-staff-counter', requireAdmin, (req, res) => {
 
   logAudit('نقل موظف إدارياً', `قام المدير العام بنقل الموظف ${staff.name} إلى ${targetCounter.name}`, 'المدير العام', 'counter');
   res.json({ success: true, message: `تم نقل ${staff.name} إلى ${targetCounter.name} بنجاح.` });
+});
+
+// Admin Assign Staff to Counter instantly
+app.post('/api/admin/counters/:id/assign-staff', requireAdmin, (req, res) => {
+  const { id: counterId } = req.params;
+  const { staffId } = req.body;
+
+  const counter = db.counters.find(c => c.id === counterId);
+  if (!counter) {
+    return res.status(404).json({ error: 'الشباك غير موجود.' });
+  }
+
+  if (staffId) {
+    const staff = db.staff.find(s => s.id === staffId);
+    if (!staff) {
+      return res.status(404).json({ error: 'الموظف غير موجود.' });
+    }
+
+    // Release staff from any other counter
+    const oldCounter = db.counters.find(c => c.currentStaffId === staffId && c.id !== counterId);
+    if (oldCounter) {
+      oldCounter.currentStaffId = undefined;
+      oldCounter.currentStaffName = undefined;
+      oldCounter.isPaused = false;
+      oldCounter.claimedAt = undefined;
+      const openSession = db.counterSessions.find(cs => cs.staffId === staffId && cs.counterId === oldCounter.id && !cs.endedAt);
+      if (openSession) openSession.endedAt = new Date().toISOString();
+    }
+
+    const previousStaffId = counter.currentStaffId;
+    if (previousStaffId && previousStaffId !== staffId) {
+      const prevStaff = db.staff.find(s => s.id === previousStaffId);
+      if (prevStaff) prevStaff.counterId = '';
+      const openSession = db.counterSessions.find(cs => cs.counterId === counterId && !cs.endedAt);
+      if (openSession) openSession.endedAt = new Date().toISOString();
+    }
+
+    counter.currentStaffId = staff.id;
+    counter.currentStaffName = staff.name;
+    counter.isPaused = false;
+    counter.claimedAt = new Date().toISOString();
+    staff.counterId = counter.id;
+
+    db.counterSessions.unshift({
+      id: `cs-${Date.now()}`,
+      staffId: staff.id,
+      staffName: staff.name,
+      counterId: counter.id,
+      counterName: counter.name,
+      startedAt: counter.claimedAt
+    });
+
+    saveDb(db);
+    broadcastState();
+    logAudit('إسناد مندوب لشباك', `تم إسناد الموظف ${staff.name} إلى ${counter.name} فورياً`, 'المدير العام', 'counter');
+    res.json({ success: true, message: `تم إسناد ${staff.name} إلى ${counter.name} بنجاح.` });
+  } else {
+    const staffIdOld = counter.currentStaffId;
+    const openSession = db.counterSessions.find(cs => cs.counterId === counterId && !cs.endedAt);
+    if (openSession) {
+      openSession.endedAt = new Date().toISOString();
+    }
+    counter.currentStaffId = undefined;
+    counter.currentStaffName = undefined;
+    counter.isPaused = false;
+    counter.claimedAt = undefined;
+
+    if (staffIdOld) {
+      const staff = db.staff.find(s => s.id === staffIdOld);
+      if (staff) staff.counterId = '';
+    }
+
+    saveDb(db);
+    broadcastState();
+    logAudit('تحرير شباك إدارياً', `تم تفريغ المندوب من ${counter.name}`, 'المدير العام', 'counter');
+    res.json({ success: true, message: `تم إخلاء الشباك بنجاح.` });
+  }
+});
+
+// Admin Assign Service to Counter instantly
+app.post('/api/admin/counters/:id/assign-service', requireAdmin, (req, res) => {
+  const { id: counterId } = req.params;
+  const { serviceId } = req.body;
+
+  const counter = db.counters.find(c => c.id === counterId);
+  if (!counter) {
+    return res.status(404).json({ error: 'الشباك غير موجود.' });
+  }
+
+  if (serviceId) {
+    const service = db.settings.categories.find(c => c.id === serviceId);
+    if (!service) {
+      return res.status(404).json({ error: 'الخدمة غير موجودة.' });
+    }
+    counter.assignedServiceId = service.id;
+    counter.assignedServiceName = service.name;
+  } else {
+    counter.assignedServiceId = undefined;
+    counter.assignedServiceName = undefined;
+  }
+
+  saveDb(db);
+  broadcastState();
+  logAudit('إسناد خدمة لشباك', `تم تعيين الخدمة (${counter.assignedServiceName || 'بدون خدمة'}) للشباك (${counter.name})`, 'المدير العام', 'settings');
+  res.json({ success: true, message: 'تم تحديث الخدمة المقدمة للشباك بنجاح.', counter });
 });
 
 // Get Counter Shifts / History
@@ -1591,14 +1739,21 @@ app.get('/api/admin/categories', requireAdmin, (req, res) => {
 });
 
 app.post('/api/admin/categories', requireAdmin, (req, res) => {
-  const { name, prefix, desc, id } = req.body;
+  const { name, prefix, desc, id, assignedCounterId } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'اسم فئة المعاملة مطلوب.' });
   }
 
   const cleanPrefix = (prefix && typeof prefix === 'string' && prefix.trim()) 
     ? prefix.trim().toUpperCase().slice(0, 3) 
-    : String.fromCharCode(65 + db.settings.categories.length);
+    : (() => {
+        const existing = db.settings.categories.map(c => c.prefix.toUpperCase());
+        for (let i = 65; i <= 90; i++) {
+          const char = String.fromCharCode(i);
+          if (!existing.includes(char)) return char;
+        }
+        return 'Z';
+      })();
 
   const cleanId = (id && typeof id === 'string' && id.trim()) 
     ? id.trim().toLowerCase().replace(/\s+/g, '_') 
@@ -1609,24 +1764,34 @@ app.post('/api/admin/categories', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'رمز تعريف الفئة مستخدم مسبقاً.' });
   }
 
+  let counterName: string | undefined = undefined;
+  if (assignedCounterId) {
+    const targetCounter = db.counters.find(c => c.id === assignedCounterId);
+    if (targetCounter) {
+      counterName = targetCounter.name;
+    }
+  }
+
   const newCat: CategoryConfig = {
     id: cleanId,
     name: name.trim(),
     prefix: cleanPrefix,
-    desc: (desc && typeof desc === 'string') ? desc.trim() : ''
+    desc: (desc && typeof desc === 'string') ? desc.trim() : '',
+    assignedCounterId: assignedCounterId || undefined,
+    assignedCounterName: counterName || undefined
   };
 
   db.settings.categories.push(newCat);
   saveDb(db);
   broadcastState();
 
-  logAudit('إضافة فئة خدمة/معاملة', `تمت إضافة فئة جديدة: ${newCat.name} (رمز: ${newCat.prefix})`, 'المدير العام', 'settings');
+  logAudit('إضافة فئة خدمة/معاملة', `تمت إضافة فئة جديدة: ${newCat.name} (رمز: ${newCat.prefix}) ${counterName ? `مسندة إلى ${counterName}` : ''}`, 'المدير العام', 'settings');
   res.json({ success: true, message: `تمت إضافة فئة (${newCat.name}) بنجاح.`, category: newCat, categories: db.settings.categories });
 });
 
 app.put('/api/admin/categories/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name, prefix, desc } = req.body;
+  const { name, prefix, desc, assignedCounterId } = req.body;
 
   const cat = db.settings.categories.find(c => c.id === id);
   if (!cat) {
@@ -1638,11 +1803,55 @@ app.put('/api/admin/categories/:id', requireAdmin, (req, res) => {
   if (prefix && typeof prefix === 'string' && prefix.trim()) cat.prefix = prefix.trim().toUpperCase().slice(0, 3);
   if (desc !== undefined && typeof desc === 'string') cat.desc = desc.trim();
 
+  if (assignedCounterId !== undefined) {
+    if (assignedCounterId) {
+      cat.assignedCounterId = assignedCounterId;
+      const targetCounter = db.counters.find(c => c.id === assignedCounterId);
+      cat.assignedCounterName = targetCounter ? targetCounter.name : undefined;
+    } else {
+      cat.assignedCounterId = undefined;
+      cat.assignedCounterName = undefined;
+    }
+  }
+
   saveDb(db);
   broadcastState();
 
   logAudit('تعديل فئة خدمة/معاملة', `تم تعديل بيانات فئة (${oldName}) ${oldName !== cat.name ? `إلى (${cat.name})` : ''}`, 'المدير العام', 'settings');
   res.json({ success: true, message: `تم تحديث فئة (${cat.name}) بنجاح.`, category: cat, categories: db.settings.categories });
+});
+
+app.post('/api/admin/categories/:id/assign-counter', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { counterId } = req.body;
+  const cat = db.settings.categories.find(c => c.id === id);
+  if (!cat) {
+    return res.status(404).json({ error: 'الخدمة غير موجودة.' });
+  }
+
+  if (counterId) {
+    const counter = db.counters.find(c => c.id === counterId);
+    if (!counter) {
+      return res.status(404).json({ error: 'الشباك غير موجود.' });
+    }
+    cat.assignedCounterId = counter.id;
+    cat.assignedCounterName = counter.name;
+  } else {
+    cat.assignedCounterId = undefined;
+    cat.assignedCounterName = undefined;
+  }
+
+  saveDb(db);
+  broadcastState();
+
+  logAudit(
+    'إسناد خدمة لشباك',
+    `تم إسناد خدمة (${cat.name}) إلى (${cat.assignedCounterName || 'غير مسندة'})`,
+    'المدير العام',
+    'settings'
+  );
+
+  res.json({ success: true, message: `تم تحديث إسناد الخدمة بنجاح`, category: cat, categories: db.settings.categories });
 });
 
 app.delete('/api/admin/categories/:id', requireAdmin, (req, res) => {
@@ -1664,6 +1873,19 @@ app.delete('/api/admin/categories/:id', requireAdmin, (req, res) => {
 
   logAudit('حذف فئة خدمة/معاملة', `تم حذف فئة (${catName}) من النظام`, 'المدير العام', 'settings');
   res.json({ success: true, message: `تم حذف فئة (${catName}) بنجاح.`, categories: db.settings.categories });
+});
+
+app.post('/api/admin/categories/:id/toggle-active', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const cat = db.settings.categories.find(c => c.id === id);
+  if (!cat) {
+    return res.status(404).json({ error: 'الخدمة غير موجودة.' });
+  }
+  cat.active = cat.active === false ? true : false;
+  saveDb(db);
+  broadcastState();
+  logAudit('تغيير حالة الخدمة', `تم ${cat.active ? 'تفعيل' : 'تعطيل'} خدمة (${cat.name})`, 'المدير العام', 'settings');
+  res.json({ success: true, message: `تم تحديث حالة خدمة (${cat.name}) بنجاح.`, category: cat, categories: db.settings.categories });
 });
 
 app.post('/api/admin/toggle-issuance', requireAdmin, (req, res) => {

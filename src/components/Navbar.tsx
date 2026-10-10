@@ -105,17 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Navigation Links */}
             <nav className="hidden xl:flex items-center gap-1 text-sm font-medium">
-              <button
-                onClick={() => setCurrentTab('home')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'home' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Wifi className="w-4 h-4" />
-                شبكة Wi-Fi و QR
-              </button>
+              {/* Removed Wifi/Grid button */}
               
               <button
                 onClick={() => setCurrentTab('kiosk')}
@@ -202,12 +192,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Mobile Bottom Navigation Bar */}
           <div className="flex xl:hidden overflow-x-auto py-2 gap-1.5 border-t border-slate-800 text-xs scrollbar-none">
-            <button
-              onClick={() => setCurrentTab('home')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'home' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
-            >
-              <Wifi className="w-3.5 h-3.5" /> الشبكة
-            </button>
+
             <button
               onClick={() => setCurrentTab('staff')}
               className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'staff' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
