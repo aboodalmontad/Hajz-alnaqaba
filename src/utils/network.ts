@@ -85,7 +85,11 @@ export async function copyToClipboard(text: string): Promise<boolean> {
  * Safely executes a fetch request and parses JSON response, guarding against HTML error pages.
  */
 export async function apiFetch(url: string, options: RequestInit = {}) {
-  const res = await fetch(url, options);
+  const fetchOptions = {
+    cache: 'no-store' as RequestCache,
+    ...options
+  };
+  const res = await fetch(url, fetchOptions);
   const contentType = res.headers.get('content-type') || '';
   
   if (contentType.includes('application/json')) {

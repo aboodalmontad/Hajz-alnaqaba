@@ -366,7 +366,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleExportCSV = async () => {
     try {
       const res = await fetch('/api/admin/export-csv', {
-        headers: { 'Authorization': `Bearer ${adminToken}` }
+        headers: { 'Authorization': `Bearer ${adminToken}`, 'Cache-Control': 'no-store' }
       });
       if (!res.ok) throw new Error('فشل تصدير التقرير');
       const blob = await res.blob();
@@ -388,11 +388,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleBackup = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    const token = adminToken || sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
+    if (!token) {
+      showToast('error', 'يرجى تسجيل الدخول أولاً بصفتك المدير العام.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/admin/backup', {
-        headers: { 'Authorization': `Bearer ${adminToken}` }
+        headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-store' }
       });
-      if (!res.ok) throw new Error('فشل تحميل النسخة الاحتياطية');
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.');
+        }
+        throw new Error(`فشل تحميل النسخة الاحتياطية (الحالة: ${res.status})`);
+      }
+      
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -404,7 +417,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       window.URL.revokeObjectURL(url);
       showToast('success', 'تم تنزيل النسخة الاحتياطية بنجاح.');
     } catch (err: any) {
-      showToast('error', err.message);
+      console.error('Backup error:', err);
+      showToast('error', err.message || 'حدث خطأ غير متوقع أثناء تحميل النسخة الاحتياطية.');
     }
   };
 
@@ -644,9 +658,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleOpenRawDb = async () => {
     setRawDbLoading(true);
     try {
-      const res = await fetch(`/api/admin/backup?token=${adminToken}`);
-      if (!res.ok) throw new Error('فشل جلب بيانات قاعدة البيانات');
-      const json = await res.json();
+      const json = await apiFetch(`/api/admin/backup?token=${adminToken}`);
       setRawDbContent(JSON.stringify(json, null, 2));
       setShowRawDbModal(true);
     } catch (err: any) {
