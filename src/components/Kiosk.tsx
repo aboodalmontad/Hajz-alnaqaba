@@ -331,85 +331,68 @@ export const Kiosk: React.FC<KioskProps> = ({
             <span className="text-xs text-slate-500">عدد الخدمات المتاحة: {categories.length}</span>
           </div>
 
-          {/* Categories Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {categories.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              const colorStyle = categoryColors[cat.prefix] || 'border-slate-300 bg-slate-50 text-slate-900';
-              return (
-                <div
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`p-5 rounded-2xl border-2 text-right transition-all flex flex-col justify-between gap-3 cursor-pointer group relative ${
-                    isSelected 
-                      ? 'border-amber-600 bg-amber-50/80 shadow-md ring-2 ring-amber-500/20' 
-                      : 'border-slate-200 bg-white hover:border-amber-400 hover:shadow-sm'
-                  }`}
-                >
-                  {/* Top row: Prefix, Name, Selected status, and Edit Button */}
-                  <div className="flex items-start justify-between w-full gap-2">
-                    <div className="flex items-center gap-3">
-                      <span className={`w-11 h-11 rounded-xl font-mono font-black text-xl flex items-center justify-center border shadow-xs ${colorStyle}`}>
-                        {cat.prefix}
-                      </span>
-                      <div>
-                        <div className="font-extrabold text-slate-900 text-lg leading-snug group-hover:text-amber-800 transition-colors">
+            {/* Categories Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {categories.map((cat) => {
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      // Directly trigger issue ticket
+                      const handleImmediateTicket = async () => {
+                        if (issuancePaused) return;
+                        setIsIssuing(true);
+                        try {
+                          const ticket = await onIssueTicket(cat.id);
+                          if (ticket) {
+                            setLastIssuedTicket(ticket);
+                            setShowModal(true);
+                            confetti({
+                              particleCount: 50,
+                              spread: 60,
+                              origin: { y: 0.7 }
+                            });
+                            playBeep();
+                          }
+                        } catch (err) {
+                          console.error('Failed to issue ticket', err);
+                        } finally {
+                          setIsIssuing(false);
+                        }
+                      };
+                      handleImmediateTicket();
+                    }}
+                    disabled={isIssuing}
+                    className="p-6 rounded-2xl border-2 text-right transition-all flex flex-col justify-between gap-4 border-slate-200 bg-white hover:border-amber-400 hover:shadow-md shadow-sm cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-3">
+                        <span className={`w-11 h-11 rounded-xl font-mono font-black text-xl flex items-center justify-center border shadow-xs ${categoryColors[cat.prefix] || 'border-slate-300 bg-slate-50 text-slate-900'}`}>
+                          {cat.prefix}
+                        </span>
+                        <div className="font-extrabold text-slate-900 text-lg leading-snug">
                           {cat.name}
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          رمز الفئة: {cat.prefix}
-                        </span>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Direct Edit Button for Admin */}
-                      <button
-                        onClick={(e) => handleOpenEditCategory(cat, e)}
-                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-amber-600 hover:text-white text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-xs border border-slate-200"
-                        title="تعديل اسم الخدمة (للمدير العام)"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline text-[11px]">تعديل الاسم</span>
-                      </button>
+                    <p className="text-xs text-slate-500">{cat.desc || 'لا يوجد وصف محدد لهذه الخدمة'}</p>
+                  </button>
+                );
+              })}
+            </div>
 
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300'}`}>
-                        {isSelected && <CheckCircle className="w-4 h-4" />}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-xs text-slate-600 leading-relaxed pr-1 font-medium">
-                    {cat.desc || 'لا يوجد وصف محدد لهذه الخدمة'}
-                  </p>
-
-                  {/* Footer hint */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>اضغط لاختيار الخدمة وإصدار التذكرة</span>
-                    <button
-                      onClick={(e) => handleOpenEditCategory(cat, e)}
-                      className="text-amber-700 hover:underline flex items-center gap-1 text-[11px] font-bold"
-                    >
-                      تعديل وتطابق اسم الخدمة &larr;
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Big Action Button */}
-          <div className="pt-2">
-            <button
-              onClick={handleGetTicket}
-              disabled={isIssuing}
-              className="w-full py-6 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-black text-2xl sm:text-3xl rounded-2xl shadow-xl hover:shadow-2xl transition-all transform active:scale-95 flex items-center justify-center gap-4 border border-amber-400/50"
-            >
-              <Ticket className="w-10 h-10 animate-bounce" />
-              احصل على رقم دور
-            </button>
-          </div>
+            {/* Big Action Button (Removed as per user request to use service buttons directly) */}
+            <div className="pt-2 hidden">
+              <button
+                onClick={handleGetTicket}
+                disabled={isIssuing}
+                className="w-full py-6 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-black text-2xl sm:text-3xl rounded-2xl shadow-xl hover:shadow-2xl transition-all transform active:scale-95 flex items-center justify-center gap-4 border border-amber-400/50"
+              >
+                <Ticket className="w-10 h-10 animate-bounce" />
+                احصل على رقم دور
+              </button>
+            </div>
 
         </div>
       )}

@@ -239,26 +239,6 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     }
   };
 
-  // Start Documenting Agency (بدء توثيق الوكالة)
-  const handleStartDocumenting = async () => {
-    if (!myServingTicket || !currentStaff) return;
-    try {
-      const res = await fetch('/api/staff/start-documenting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticketId: myServingTicket.id,
-          staffId: currentStaff.id
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشلت العملية.');
-      showToast('success', 'تم بدء توثيق الوكالة للمراجع.');
-    } catch (err: any) {
-      showToast('error', err.message);
-    }
-  };
-
   // Call Next Ticket
   const handleCallNext = async () => {
     if (!currentStaff || !activeCounter) return;
@@ -712,15 +692,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               
               {/* Start Documenting Button */}
-              {!myServingTicket.documentingStartedAt ? (
-                <button
-                  onClick={handleStartDocumenting}
-                  className="sm:col-span-2 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 text-base active:scale-98"
-                >
-                  <FileCheck2 className="w-5 h-5" />
-                  بدء توثيق الوكالة (حضر المراجع)
-                </button>
-              ) : null}
+              {/* Removed by user request */}
 
               {/* Recall Button */}
               <button

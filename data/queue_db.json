@@ -1,6 +1,6 @@
 {
   "date": "2026-10-09",
-  "ticketSequence": 8,
+  "ticketSequence": 17,
   "issuancePaused": false,
   "settings": {
     "departmentTitle": "دائرة الوكالات – نقابة المحامين بحلب",
@@ -27,18 +27,141 @@
       {
         "id": "attestation",
         "prefix": "C",
-        "name": "تصديق العقود",
-        "desc": "تصديق وتثبيت العقود والاتفاقيات القانونية"
+        "name": "تنظيم وكالة خاصة",
+        "desc": "وكالات البيع، الفراغ، الإدارة، والتصرف العقاري والمركبات"
       },
       {
         "id": "inquiry",
         "prefix": "D",
-        "name": "الاستعلامات والدعم",
-        "desc": "الاستعلام عن الأوراق المطلوبة والرسوم النقابية"
+        "name": "تصديق العقود والاستعلامات",
+        "desc": "تصديق وتثبيت العقود والاتفاقيات والاستعلام عن الرسوم النقابية"
       }
     ]
   },
   "tickets": [
+    {
+      "id": "ticket-1791583826182-ybz6",
+      "number": 17,
+      "displayNumber": "A-017",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:10:26.182Z",
+      "calledAt": "2026-10-09T22:13:19.839Z",
+      "counterId": "counter-3",
+      "counterName": "الشباك 3 (توثيق وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:13:24.064Z"
+    },
+    {
+      "id": "ticket-1791583823097-b58k",
+      "number": 16,
+      "displayNumber": "A-016",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:10:23.097Z",
+      "calledAt": "2026-10-09T22:13:07.864Z",
+      "counterId": "counter-3",
+      "counterName": "الشباك 3 (توثيق وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:13:14.964Z"
+    },
+    {
+      "id": "ticket-1791583820148-0ncp",
+      "number": 15,
+      "displayNumber": "A-015",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:10:20.148Z",
+      "calledAt": "2026-10-09T22:13:02.639Z",
+      "counterId": "counter-3",
+      "counterName": "الشباك 3 (توثيق وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:13:05.955Z"
+    },
+    {
+      "id": "ticket-1791583778624-elp4",
+      "number": 14,
+      "displayNumber": "B-014",
+      "category": "special",
+      "categoryNameArabic": "الحصول على صورة عن وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:09:38.624Z",
+      "calledAt": "2026-10-09T22:10:01.143Z",
+      "counterId": "counter-2",
+      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:10:03.928Z"
+    },
+    {
+      "id": "ticket-1791583775697-66y3",
+      "number": 13,
+      "displayNumber": "B-013",
+      "category": "special",
+      "categoryNameArabic": "الحصول على صورة عن وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:09:35.697Z",
+      "calledAt": "2026-10-09T22:09:56.779Z",
+      "counterId": "counter-2",
+      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:09:59.519Z"
+    },
+    {
+      "id": "ticket-1791583773610-samc",
+      "number": 12,
+      "displayNumber": "B-012",
+      "category": "special",
+      "categoryNameArabic": "الحصول على صورة عن وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:09:33.610Z",
+      "calledAt": "2026-10-09T22:09:47.545Z",
+      "counterId": "counter-2",
+      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:09:55.346Z"
+    },
+    {
+      "id": "ticket-1791583645285-umkq",
+      "number": 11,
+      "displayNumber": "C-011",
+      "category": "attestation",
+      "categoryNameArabic": "تصديق العقود",
+      "status": "waiting",
+      "createdAt": "2026-10-09T22:07:25.285Z"
+    },
+    {
+      "id": "ticket-1791583640457-5mep",
+      "number": 10,
+      "displayNumber": "D-010",
+      "category": "inquiry",
+      "categoryNameArabic": "الاستعلامات والدعم",
+      "status": "waiting",
+      "createdAt": "2026-10-09T22:07:20.457Z"
+    },
+    {
+      "id": "ticket-1791583634529-le74",
+      "number": 9,
+      "displayNumber": "A-009",
+      "category": "general",
+      "categoryNameArabic": "توثيق وكالة",
+      "status": "completed",
+      "createdAt": "2026-10-09T22:07:14.529Z",
+      "calledAt": "2026-10-09T22:12:56.628Z",
+      "counterId": "counter-3",
+      "counterName": "الشباك 3 (توثيق وكالة)",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "completedAt": "2026-10-09T22:13:01.387Z"
+    },
     {
       "id": "ticket-1791572785350-7sfw",
       "number": 8,
@@ -142,7 +265,7 @@
       "id": "staff-1791572724537",
       "name": "زكريا ننه",
       "pin": "123456",
-      "counterId": "",
+      "counterId": "counter-3",
       "active": true,
       "role": "staff",
       "jobTitle": "مندوب وكالات",
@@ -152,7 +275,7 @@
   "counters": [
     {
       "id": "counter-1",
-      "name": "الشباك 1 (وكالات عامة)",
+      "name": "الشباك 1 (توثيق وكالة)",
       "isOpen": true,
       "isPaused": false,
       "currentStaffId": "staff-1791572701221",
@@ -161,15 +284,18 @@
     },
     {
       "id": "counter-2",
-      "name": "الشباك 2 (وكالات خاصة)",
+      "name": "الشباك 2 (الحصول على صورة عن وكالة)",
       "isOpen": true,
       "isPaused": false
     },
     {
       "id": "counter-3",
-      "name": "الشباك 3 (تصديق العقود)",
+      "name": "الشباك 3 (توثيق وكالة)",
       "isOpen": true,
-      "isPaused": false
+      "isPaused": false,
+      "currentStaffId": "staff-1791572724537",
+      "currentStaffName": "زكريا ننه",
+      "claimedAt": "2026-10-09T22:10:50.065Z"
     },
     {
       "id": "counter-4",
@@ -180,6 +306,23 @@
   ],
   "counterSessions": [
     {
+      "id": "cs-1791583850066-emp5",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "counterId": "counter-3",
+      "counterName": "الشباك 3 (توثيق وكالة)",
+      "startedAt": "2026-10-09T22:10:50.065Z"
+    },
+    {
+      "id": "cs-1791583739977-as6k",
+      "staffId": "staff-1791572724537",
+      "staffName": "زكريا ننه",
+      "counterId": "counter-2",
+      "counterName": "الشباك 2 (الحصول على صورة عن وكالة)",
+      "startedAt": "2026-10-09T22:08:59.977Z",
+      "endedAt": "2026-10-09T22:10:33.592Z"
+    },
+    {
       "id": "cs-1791572758617-l92a",
       "staffId": "staff-1791572701221",
       "staffName": "حسان مرشحة",
@@ -189,6 +332,246 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1791584004065-lcbf",
+      "timestamp": "2026-10-09T22:13:24.065Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-017 بنجاح على الشباك 3 (توثيق وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583999840-2gpj",
+      "timestamp": "2026-10-09T22:13:19.840Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 3 (توثيق وكالة) استدعى التذكرة A-017",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583994965-om7a",
+      "timestamp": "2026-10-09T22:13:14.965Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-016 بنجاح على الشباك 3 (توثيق وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583987864-7y1u",
+      "timestamp": "2026-10-09T22:13:07.864Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 3 (توثيق وكالة) استدعى التذكرة A-016",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583985955-g5wy",
+      "timestamp": "2026-10-09T22:13:05.955Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-015 بنجاح على الشباك 3 (توثيق وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583982640-j2ur",
+      "timestamp": "2026-10-09T22:13:02.640Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 3 (توثيق وكالة) استدعى التذكرة A-015",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583981388-zfdn",
+      "timestamp": "2026-10-09T22:13:01.388Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة A-009 بنجاح على الشباك 3 (توثيق وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583976629-1wrr",
+      "timestamp": "2026-10-09T22:12:56.629Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 3 (توثيق وكالة) استدعى التذكرة A-009",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583928686-nn45",
+      "timestamp": "2026-10-09T22:12:08.686Z",
+      "action": "تعديل اسم الشباك وحفظه",
+      "details": "تم تعديل اسم الشباك من (الشباك 4 (تصديق العقود والاستعلامات)) إلى (الشباك 4 (الاستعلامات)) وحفظ التغييرات بنجاح",
+      "user": "المدير العام",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791583908611-rz0g",
+      "timestamp": "2026-10-09T22:11:48.611Z",
+      "action": "تعديل اسم الشباك وحفظه",
+      "details": "تم تعديل اسم الشباك من (الشباك 3 (تنظيم وكالة خاصة)) إلى (الشباك 3 (توثيق وكالة)) وحفظ التغييرات بنجاح",
+      "user": "المدير العام",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791583873310-zydd",
+      "timestamp": "2026-10-09T22:11:13.310Z",
+      "action": "تسجيل دخول المدير",
+      "details": "تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة",
+      "user": "المدير العام",
+      "category": "auth"
+    },
+    {
+      "id": "log-1791583850066-lrt5",
+      "timestamp": "2026-10-09T22:10:50.066Z",
+      "action": "بدء العمل على الشباك",
+      "details": "قام المندوب زكريا ننه بحجز وبدء العمل على الشباك 3 (تنظيم وكالة خاصة)",
+      "user": "زكريا ننه",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791583833593-wr5b",
+      "timestamp": "2026-10-09T22:10:33.593Z",
+      "action": "إنهاء العمل على الشباك",
+      "details": "أنهى المندوب زكريا ننه عمله على الشباك 2 (الحصول على صورة عن وكالة)",
+      "user": "زكريا ننه",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791583826183-ugpw",
+      "timestamp": "2026-10-09T22:10:26.183Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-017 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583823098-thjg",
+      "timestamp": "2026-10-09T22:10:23.098Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-016 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583820149-ra21",
+      "timestamp": "2026-10-09T22:10:20.149Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-015 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583803929-2z9y",
+      "timestamp": "2026-10-09T22:10:03.929Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة B-014 بنجاح على الشباك 2 (الحصول على صورة عن وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583801144-lrj0",
+      "timestamp": "2026-10-09T22:10:01.144Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 2 (الحصول على صورة عن وكالة) استدعى التذكرة B-014",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583799520-nxq3",
+      "timestamp": "2026-10-09T22:09:59.520Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة B-013 بنجاح على الشباك 2 (الحصول على صورة عن وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583796780-v8m9",
+      "timestamp": "2026-10-09T22:09:56.780Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 2 (الحصول على صورة عن وكالة) استدعى التذكرة B-013",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583795347-s00n",
+      "timestamp": "2026-10-09T22:09:55.347Z",
+      "action": "إنهاء خدمة",
+      "details": "تمت خدمة وتوثيق التذكرة B-012 بنجاح على الشباك 2 (الحصول على صورة عن وكالة)",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583787546-s7i6",
+      "timestamp": "2026-10-09T22:09:47.546Z",
+      "action": "استدعاء مراجع",
+      "details": "الموظف زكريا ننه على الشباك 2 (الحصول على صورة عن وكالة) استدعى التذكرة B-012",
+      "user": "زكريا ننه",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583778625-r72f",
+      "timestamp": "2026-10-09T22:09:38.625Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم B-014 (الحصول على صورة عن وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583775698-rwo8",
+      "timestamp": "2026-10-09T22:09:35.698Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم B-013 (الحصول على صورة عن وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583773611-5uvi",
+      "timestamp": "2026-10-09T22:09:33.611Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم B-012 (الحصول على صورة عن وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583739978-aq3w",
+      "timestamp": "2026-10-09T22:08:59.978Z",
+      "action": "بدء العمل على الشباك",
+      "details": "قام المندوب زكريا ننه بحجز وبدء العمل على الشباك 2 (الحصول على صورة عن وكالة)",
+      "user": "زكريا ننه",
+      "category": "counter"
+    },
+    {
+      "id": "log-1791583726450-j5zi",
+      "timestamp": "2026-10-09T22:08:46.450Z",
+      "action": "تسجيل دخول موظف",
+      "details": "قام الموظف زكريا ننه بتسجيل الدخول عبر الهاتف",
+      "user": "زكريا ننه",
+      "category": "auth"
+    },
+    {
+      "id": "log-1791583645286-1jv8",
+      "timestamp": "2026-10-09T22:07:25.286Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم C-011 (تصديق العقود)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583640458-e6lg",
+      "timestamp": "2026-10-09T22:07:20.458Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم D-010 (الاستعلامات والدعم)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
+    {
+      "id": "log-1791583634531-mhaa",
+      "timestamp": "2026-10-09T22:07:14.531Z",
+      "action": "إصدار تذكرة",
+      "details": "تم إصدار التذكرة رقم A-009 (توثيق وكالة)",
+      "user": "جهاز إصدار التذاكر",
+      "category": "ticket"
+    },
     {
       "id": "log-1791572953448-a52y",
       "timestamp": "2026-10-09T19:09:13.448Z",
@@ -474,6 +857,7 @@
     "admin-token-1791572413938-8471e54940c263332f31b879065dc01e",
     "admin-token-1791572554981-cc2332cce9fb9882f2ccf115ad5605c5",
     "admin-token-1791571795856-458dc87fcf78b97a9592f2ec8057da0f",
-    "admin-token-new-session-test"
+    "admin-token-new-session-test",
+    "admin-token-1791583873309-f5a5076de104188fe5678b237e1fb91f"
   ]
 }

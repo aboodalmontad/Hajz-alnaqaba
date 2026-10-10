@@ -21,6 +21,8 @@ export interface Ticket {
   notes?: string;
 }
 
+export type TicketType = Ticket;
+
 export interface Staff {
   id: string;
   name: string;

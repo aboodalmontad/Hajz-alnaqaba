@@ -46,13 +46,14 @@ import {
   Sparkles
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Staff, Counter, Ticket, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
+import { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
+import { Kiosk } from './Kiosk';
 
 interface AdminDashboardProps {
   staffList: Staff[];
   counters: Counter[];
-  tickets: Ticket[];
+  tickets: TicketType[];
   counterSessions?: CounterSession[];
   issuancePaused: boolean;
   date: string;
@@ -87,7 +88,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [authLoading, setAuthLoading] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs'>('data_management');
+  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs' | 'issuance_control'>('issuance_control');
   const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts' | 'categories' | 'database'>('counters');
 
   // Agent QR URL calculation
@@ -102,10 +103,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [shiftSearch, setShiftSearch] = useState('');
 
   // Modals & form states (Tickets)
-  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
   const [showAddTicketModal, setShowAddTicketModal] = useState(false);
   const [ticketFormNumber, setTicketFormNumber] = useState('');
-  const [ticketFormStatus, setTicketFormStatus] = useState<Ticket['status']>('waiting');
+  const [ticketFormStatus, setTicketFormStatus] = useState<TicketType['status']>('waiting');
   const [ticketFormCounter, setTicketFormCounter] = useState('');
   const [ticketFormStaff, setTicketFormStaff] = useState('');
   const [ticketFormCategory, setTicketFormCategory] = useState('');
@@ -403,7 +404,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // ----------------------------------------------------
   // TICKET ACTIONS
   // ----------------------------------------------------
-  const openEditTicketModal = (ticket: Ticket) => {
+  const openEditTicketModal = (ticket: TicketType) => {
     setEditingTicket(ticket);
     setTicketFormNumber(ticket.displayNumber);
     setTicketFormStatus(ticket.status);
@@ -1074,6 +1075,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Main Navigation Tabs */}
       <div className="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 flex gap-2 overflow-x-auto">
         <button
+          onClick={() => setActiveTab('issuance_control')}
+          className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'issuance_control' 
+              ? 'bg-amber-600 text-white shadow-md' 
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Ticket className="w-4 h-4" />
+          لوحة تحكم إصدار الدور (Kiosk)
+        </button>
+
+        <button
           onClick={() => setActiveTab('data_management')}
           className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'data_management' 
@@ -1122,6 +1135,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
       </div>
 
+      {/* SUBTAB: ISSUANCE CONTROL (KIOSK) */}
+      {activeTab === 'issuance_control' && (
+        <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200">
+          <Kiosk
+            issuancePaused={issuancePaused}
+            waitingCount={tickets.filter(t => t.status === 'waiting').length}
+            categories={settings.categories}
+            departmentTitle={settings.departmentTitle}
+            counters={counters}
+            onRefreshState={onRefreshState}
+            onIssueTicket={async (category) => {
+              try {
+                const data = await adminFetch('/api/tickets', {
+                  method: 'POST',
+                  body: JSON.stringify({ category })
+                });
+                onRefreshState();
+                return data.ticket;
+              } catch (err) {
+                console.error('Error issuing ticket', err);
+                return null;
+              }
+            }}
+          />
+        </div>
+      )}
+
       {/* ======================================================== */}
       {/* SECTION 1: إدارة بيانات النظام (SYSTEM DATA MANAGEMENT) */}
       {/* ======================================================== */}
@@ -1153,14 +1193,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}
             >
               <span>الموظفون والصلاحيات ({staffList.length})</span>
-            </button>
-            <button
-              onClick={() => setDataSubTab('categories')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                dataSubTab === 'categories' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <span>خدمات جهاز الإصدار والشبابيك ({settings?.categories?.length || 0})</span>
             </button>
             <button
               onClick={() => setDataSubTab('shifts')}
@@ -2398,17 +2430,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             <form onSubmit={handleSaveCounter} className="space-y-4">
+              {/* Service Matching Selection */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">اسم الشباك:</label>
-                <input
-                  type="text"
+                <label className="text-xs font-bold text-slate-700">تحديد الخدمة المخصصة لهذا الشباك:</label>
+                <select
                   value={counterFormName}
                   onChange={e => setCounterFormName(e.target.value)}
-                  placeholder="مثال: الشباك 1 (وكالات عامة وتوثيق)"
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  autoFocus
                   required
-                />
+                >
+                  <option value="">-- اختر الخدمة المخصصة لهذا الشباك --</option>
+                  {settings?.categories?.map(cat => (
+                    <option key={cat.id} value={`الشباك ${counters.length + 1} (${cat.name})`}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">سيتم تلقائياً تعيين الخدمة المختارة لهذا الشباك</p>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">

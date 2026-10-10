@@ -172,9 +172,9 @@ const defaultSettings: SystemSettings = {
   adminPin: '9999',
   categories: [
     { id: 'general', prefix: 'A', name: 'توثيق وكالة', desc: 'تنظيم وتوثيق الوكالات العامة والخاصة وتثبيتها أصولاً' },
-    { id: 'copy', prefix: 'B', name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة' },
-    { id: 'special', prefix: 'C', name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع، الفراغ، الإدارة، والتصرف العقاري والمركبات' },
-    { id: 'attestation', prefix: 'D', name: 'تصديق العقود والاستعلامات', desc: 'تصديق وتثبيت العقود والاتفاقيات والاستعلام عن الرسوم النقابية' }
+    { id: 'special', prefix: 'B', name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة' },
+    { id: 'attestation', prefix: 'C', name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع، الفراغ، الإدارة، والتصرف العقاري والمركبات' },
+    { id: 'inquiry', prefix: 'D', name: 'تصديق العقود والاستعلامات', desc: 'تصديق وتثبيت العقود والاتفاقيات والاستعلام عن الرسوم النقابية' }
   ]
 };
 
@@ -777,9 +777,22 @@ app.post('/api/staff/call-next', (req, res) => {
   }
 
   // Find oldest waiting ticket (FIFO) atomically
-  const nextTicket = db.tickets.slice().reverse().find(t => t.status === 'waiting');
+  // Restrict to tickets whose category matches the service indicated in the counter name
+  // Counter names are structured like: "الشباك 1 (اسم الخدمة)"
+  const counterServiceMatch = counter.name.match(/\((.*?)\)/);
+  const counterService = counterServiceMatch ? counterServiceMatch[1] : null;
+
+  let nextTicket = null;
+  if (counterService) {
+    // Try to find a waiting ticket that matches the counter's service name
+    nextTicket = db.tickets.slice().reverse().find(t => t.status === 'waiting' && t.categoryNameArabic === counterService);
+  } else {
+    // Fallback to any waiting ticket if no service match found in counter name
+    nextTicket = db.tickets.slice().reverse().find(t => t.status === 'waiting');
+  }
+
   if (!nextTicket) {
-    return res.status(404).json({ error: 'لا توجد تذاكر في قائمة الانتظار حالياً.' });
+    return res.status(404).json({ error: `لا توجد تذاكر في قائمة الانتظار لهذا الشباك ${counterService ? `(${counterService})` : 'حالياً'}.` });
   }
 
   nextTicket.status = 'serving';
