@@ -66,6 +66,21 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
   const [cacheResult, setCacheResult] = useState<ClearCacheResult | null>(null);
   const [cacheMsg, setCacheMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const [wifiSsid, setWifiSsid] = useState(() => localStorage.getItem('agency_wifi_ssid') || '');
+  const [wifiPass, setWifiPass] = useState(() => localStorage.getItem('agency_wifi_pass') || '');
+  const [wifiSecurity, setWifiSecurity] = useState<'WPA' | 'WEP' | 'nopass'>(() => (localStorage.getItem('agency_wifi_sec') as any) || 'WPA');
+
+  const handleSaveWifi = (ssid: string, pass: string, sec: 'WPA' | 'WEP' | 'nopass') => {
+    setWifiSsid(ssid);
+    setWifiPass(pass);
+    setWifiSecurity(sec);
+    try {
+      localStorage.setItem('agency_wifi_ssid', ssid);
+      localStorage.setItem('agency_wifi_pass', pass);
+      localStorage.setItem('agency_wifi_sec', sec);
+    } catch {}
+  };
+
   // Auto-connect and activate server as soon as the Home page is entered
   useEffect(() => {
     if (onActivateServer) {
@@ -327,6 +342,26 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               <span>إعادة تحميل نظيفة (Hard Refresh)</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Offline Wi-Fi Connection Troubleshooting Banner */}
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-sm flex items-start gap-4 text-amber-950">
+        <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md">
+          <Wifi className="w-5 h-5" />
+        </div>
+        <div className="space-y-1.5 text-xs sm:text-sm">
+          <h3 className="font-black text-amber-900 text-sm sm:text-base">
+            ⚠️ تنبيه هام جداً عند الاتصال برواتـر محلي بدون إنترنت من الهواتف:
+          </h3>
+          <p className="leading-relaxed font-medium text-amber-900/90">
+            إذا كان الراوتر غير متصل بالإنترنت، قد تقوم بعض هواتف أندرويد أو آيفون بتبديل الاتصال تلقائياً إلى <strong>بيانات الجوال (4G/5G)</strong> أو رفض فتح صفحة محلية. لضمان عمل واجهة المندوب والشاشة فوراً:
+          </p>
+          <ul className="list-disc list-inside space-y-1 font-semibold text-amber-950 pr-2">
+            <li>قم بـ <strong>إيقاف بيانات الهاتف (Mobile Data)</strong> مؤقتاً في الهاتف قبل فتح الرابط.</li>
+            <li>عند ظهور رسالة الهاتف <em>«الشبكة لا توجد بها إنترنت، هل تريد البقاء متصلاً؟»</em> اختر <strong>«البقاء متصلاً»</strong> أو <strong>«Keep Connected»</strong> ولا تقم بقطع الاتصال.</li>
+            <li>تأكد من كتابة عنوان الـ IP المحلي الصحيح للكمبيوتر الخادم (مثلاً <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-900">http://192.168.1.50:3000</code>) أو مسح رمز QR مباشرة بكاميرا الهاتف.</li>
+          </ul>
         </div>
       </div>
 
@@ -786,6 +821,133 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               تم مسح {cacheResult.cachesCleared} مستودع كاش بنجاح ({cacheResult.timestamp})
             </div>
           )}
+        </div>
+      </div>
+
+      {/* WIFI QR CODE GENERATOR CARD FOR LOCAL OFFLINE ROUTERS */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-500/30 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700 pb-5">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold border border-amber-500/30">
+              <Wifi className="w-3.5 h-3.5" /> الاتصال الفوري بالشبكة المحلية بدون إنترنت
+            </div>
+            <h3 className="text-xl font-black tracking-tight mt-1">
+              باركود الاتصال السريع بشبكة الواي فاي (Wi-Fi QR Code)
+            </h3>
+            <p className="text-xs text-slate-300 mt-0.5">
+              أنشئ رمز QR لشبكة الواي فاي المحلية الخاصة بالفرع. عندما يمسحه المندوب بكاميرا هاتفه، سيتصل تلقائياً بالشبكة المحلية في ثانية واحدة دون الحاجة لإدخال كلمة المرور يدويًا!
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          <div className="md:col-span-5 flex flex-col items-center justify-center p-6 bg-slate-950/80 rounded-2xl border border-slate-700 space-y-4">
+            {wifiSsid ? (
+              <div className="p-4 bg-white rounded-2xl shadow-lg border border-slate-100">
+                <QRCodeSVG 
+                  value={`WIFI:S:${wifiSsid};T:${wifiSecurity};P:${wifiPass};;`}
+                  size={190}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+            ) : (
+              <div className="text-center p-8 text-slate-400 text-xs space-y-2">
+                <Wifi className="w-8 h-8 mx-auto text-amber-500 opacity-50" />
+                <p>أدخل اسم شبكة الواي فاي (SSID) أدناه لتوليد باركود الاتصال السريع</p>
+              </div>
+            )}
+            <div className="text-center">
+              <span className="text-xs font-bold text-amber-300">
+                {wifiSsid ? `شبكة: ${wifiSsid}` : 'الشبكة غير محددة بعد'}
+              </span>
+            </div>
+          </div>
+
+          <div className="md:col-span-7 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">اسم شبكة الواي فاي المحلية (SSID):</label>
+              <input 
+                type="text"
+                value={wifiSsid}
+                onChange={e => handleSaveWifi(e.target.value, wifiPass, wifiSecurity)}
+                placeholder="مثال: AleppoBar_LAN أو Agency_Wifi"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">كلمة مرور شبكة الواي فاي (Password):</label>
+              <input 
+                type="text"
+                value={wifiPass}
+                onChange={e => handleSaveWifi(wifiSsid, e.target.value, wifiSecurity)}
+                placeholder="كلمة المرور الخاصة بالراوتر المحلي"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500 focus:outline-none font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">نوع الحماية (Security Type):</label>
+              <select
+                value={wifiSecurity}
+                onChange={e => handleSaveWifi(wifiSsid, wifiPass, e.target.value as any)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+              >
+                <option value="WPA">WPA / WPA2 / WPA3 (الأكثر شيوعاً)</option>
+                <option value="WEP">WEP (قديم)</option>
+                <option value="nopass">بدون كلمة مرور (شبكة مفتوحة)</option>
+              </select>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-[11px] text-amber-200 leading-relaxed">
+              💡 <strong>كيف يستعمل المندوب هذه الميزة؟</strong><br />
+              1. يفتح المندوب كاميرا هاتفه ويقوم بمسح <strong>باركود الواي فاي</strong> أعلاه فيتصل تلقائياً بالشبكة دون كتابة كلمة المرور.<br />
+              2. ثم يقوم بمسح <strong>باركود بوابة المندوب</strong> (أو فتح الرابط) لفتح النظام واستقبال المراجعين فوراً.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DUAL CONNECTIVITY CARD: Wi-Fi + 4G Mobile Data */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+            <Smartphone className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              تشغيل نظام الدور (Wi-Fi محلي) والبيانات الشخصية (4G) معاً في نفس الوقت
+            </h3>
+            <p className="text-xs text-slate-500">
+              كيف يعمل الهاتف على الشبكة المحلية للفرع وفي نفس الوقت يتلقى الرسائل والإشعارات عبر بيانات الجوال (4G/5G)؟
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs sm:text-sm text-slate-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-slate-900 flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold inline-flex items-center justify-center">1</span>
+              طريقة العمل التلقائية (في أندرويد وهواتف حديثة)
+            </h4>
+            <p className="text-slate-600 leading-relaxed text-xs">
+              أنظمة الهواتف الحديثة (مثل Android) تدعم بشكل افتراضي توجيه الطلبات الخاصة بالشبكات الداخلية (مثل <code className="font-mono bg-slate-200 px-1 rounded text-slate-800">192.168.x.x</code>) عبر الواي فاي المحلي، بينما تظل طلبات الإنترنت العام (واتساب، تيليجرام، المتصفحات الأخرى) تعمل عبر **بيانات الهاتف 4G** بسلاسة تامة دون تعارض.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-slate-900 flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold inline-flex items-center justify-center">2</span>
+              خطوات الإعداد على هاتف المندوب
+            </h4>
+            <ul className="list-disc list-inside space-y-1 text-xs text-slate-600">
+              <li>تأكد من تشغيل <strong>الواي فاي (Wi-Fi)</strong> والاتصال براوتر الفرع المحلي.</li>
+              <li>تأكد من إبقاء <strong>بيانات الجوال (Mobile Data / 4G)</strong> قيد التشغيل أيضاً في إعدادات الهاتف.</li>
+              <li>عند الاتصال بالواي فاي بدون إنترنت وظهر تنبيه <em>«الشبكة لا توجد بها إنترنت»</em>، اختر <strong>«البقاء متصلاً» (Keep Connected)</strong> أو <strong>«عدم التبديل تلقائياً»</strong>.</li>
+              <li>بهذه الطريقة يظل المندوب متصلاً بنظام الدور المحلي وفي نفس الوقت يتلقى رسائله الشخصية عبر الـ 4G.</li>
+            </ul>
+          </div>
         </div>
       </div>
 

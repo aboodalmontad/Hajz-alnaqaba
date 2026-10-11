@@ -227,8 +227,7 @@ export default function App() {
         });
         return true;
       })
-      .catch(err => {
-        console.error('Failed to fetch initial state:', err);
+      .catch(() => {
         setConnected(false);
         return false;
       })

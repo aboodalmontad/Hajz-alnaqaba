@@ -436,7 +436,7 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
                     )}
                   </div>
 
-                  {/* Giant Central Ticket Number */}
+                        {/* Giant Central Ticket Number */}
                   <div className="py-6 sm:py-8 text-center flex-1 flex flex-col justify-center">
                     {currentServing ? (
                       <div className="space-y-3">
@@ -451,10 +451,6 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
                               : 'text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.3)]'
                         }`}>
                           {currentServing.displayNumber}
-                        </div>
-                        <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-slate-950/70 border border-amber-500/30 text-xs sm:text-sm font-bold text-slate-200">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{currentServing.categoryNameArabic}</span>
                         </div>
                       </div>
                     ) : (
