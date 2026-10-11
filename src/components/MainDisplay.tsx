@@ -405,8 +405,8 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
                               ? 'bg-emerald-500' 
                               : 'bg-slate-600'
                       }`} />
-                      <span className="text-base sm:text-lg font-black text-white tracking-tight">
-                        {card.counterName}
+                      <span className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                        {card.counterName.replace(/\s*\(.*\)$/, '').trim()}
                       </span>
                     </div>
 
