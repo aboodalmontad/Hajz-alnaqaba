@@ -1086,38 +1086,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div className="text-xs text-slate-300 mt-1 flex items-center gap-3">
               <span>تاريخ التشغيل: <strong className="text-amber-400 font-mono">{date}</strong></span>
-              <span>·</span>
-              <span>حالة الإصدار: <strong className={issuancePaused ? 'text-red-400' : 'text-emerald-400'}>{issuancePaused ? 'متوقف مؤقتاً' : 'نشط وجاهز'}</strong></span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Removed button */}
-          
-          <button
-            onClick={handleToggleIssuance}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-sm ${
-              issuancePaused 
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-            }`}
-          >
-            {issuancePaused ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
-            {issuancePaused ? 'استئناف إصدار التذاكر' : 'إيقاف إصدار التذاكر مؤقتاً'}
-          </button>
-
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate('kiosk')}
-              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all"
-              title="فتح جهاز إصدار الدور بملء الشاشة للمراجعين"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-              <span>جهاز الإصدار للمراجعين</span>
-            </button>
-          )}
-
           <button
             onClick={handleNewDay}
             className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
@@ -1234,7 +1207,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </button>
       </div>
 
-      {/* SUBTAB: ISSUANCE CONTROL (KIOSK) */}
       {/* ======================================================== */}
       {/* SECTION 1: إدارة بيانات النظام (SYSTEM DATA MANAGEMENT) */}
       {/* ======================================================== */}

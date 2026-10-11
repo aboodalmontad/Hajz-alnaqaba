@@ -90,29 +90,26 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     ...options
   };
   const res = await fetch(url, fetchOptions);
-  const contentType = res.headers.get('content-type') || '';
-  
-  if (contentType.includes('application/json')) {
-    const data = await res.json();
-    if (!res.ok) {
-      const err: any = new Error(data.error || data.message || `خطأ في الخادم (${res.status})`);
-      err.status = res.status;
-      err.data = data;
-      throw err;
-    }
-    return data;
-  } else {
-    const text = await res.text();
-    if (!res.ok) {
-      const err: any = new Error(`تعذر الاتصال بالخادم (${res.status}): ${text.substring(0, 80)}`);
-      err.status = res.status;
-      throw err;
-    }
+  const text = await res.text();
+
+  if (!res.ok) {
+    let errorMsg = `خطأ في الخادم (${res.status})`;
     try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error('استجابة غير صالحة من الخادم (ليست بصيغة JSON)');
+      const parsed = JSON.parse(text);
+      errorMsg = parsed.error || parsed.message || errorMsg;
+    } catch {}
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    throw err;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (text.trim().startsWith('<')) {
+      throw new Error('الخادم قيد البدء أو يعيد توجيه الصفحة، يرجى المحاولة بعد قليل.');
     }
+    throw new Error('استجابة غير صالحة من الخادم (ليست بصيغة JSON)');
   }
 }
 

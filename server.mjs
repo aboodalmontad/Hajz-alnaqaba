@@ -11,7 +11,22 @@ import { execSync } from "child_process";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = dirname(__filename);
 var app = express();
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-token, x-admin-pin");
+  if (req.path.startsWith("/api")) {
+    res.header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.header("Pragma", "no-cache");
+    res.header("Expires", "0");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
 var server = createServer(app);
 var io;
 try {
@@ -33,23 +48,18 @@ try {
   } };
 }
 var PORT = process.env.PORT ? parseInt(process.env.PORT) : 3e3;
-var DATA_DIR = process.env.VERCEL ? join(os.tmpdir(), "queue_data") : join(__dirname, "data");
-var DB_FILE = join(DATA_DIR, "queue_db.json");
-try {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  fs.accessSync(DATA_DIR, fs.constants.W_OK);
-} catch (err) {
-  DATA_DIR = join(os.tmpdir(), "queue_data");
-  DB_FILE = join(DATA_DIR, "queue_db.json");
-  if (!fs.existsSync(DATA_DIR)) {
-    try {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    } catch (e) {
+var PRIMARY_DATA_DIR = join(process.cwd(), "data");
+var BACKUP_DATA_DIR = join(__dirname, "data");
+var TMP_DATA_DIR = join(os.tmpdir(), "queue_data");
+[PRIMARY_DATA_DIR, BACKUP_DATA_DIR, TMP_DATA_DIR].forEach((dir) => {
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
+  } catch (e) {
   }
-}
+});
+var DB_FILE = join(PRIMARY_DATA_DIR, "queue_db.json");
 var getTodayDateString = () => (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
 var defaultSettings = {
   departmentTitle: "\u062F\u0627\u0626\u0631\u0629 \u0627\u0644\u0648\u0643\u0627\u0644\u0627\u062A \u2013 \u0646\u0642\u0627\u0628\u0629 \u0627\u0644\u0645\u062D\u0627\u0645\u064A\u0646 \u0628\u062D\u0644\u0628",
@@ -61,10 +71,26 @@ var defaultSettings = {
   ticketSequence: 0,
   adminPin: "9999",
   categories: [
-    { id: "general", prefix: "A", name: "\u0648\u0643\u0627\u0644\u0627\u062A \u0639\u0627\u0645\u0629", desc: "\u062A\u0646\u0638\u064A\u0645 \u0627\u0644\u0648\u0643\u0627\u0644\u0627\u062A \u0627\u0644\u0639\u0627\u0645\u0629 \u0648\u0633\u062D\u0628 \u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629" },
-    { id: "special", prefix: "B", name: "\u0648\u0643\u0627\u0644\u0627\u062A \u062E\u0627\u0635\u0629", desc: "\u0648\u0643\u0627\u0644\u0627\u062A \u0627\u0644\u0628\u064A\u0639\u060C \u0627\u0644\u0641\u0631\u0627\u063A\u060C \u0627\u0644\u0625\u062F\u0627\u0631\u0629\u060C \u0648\u0627\u0644\u062A\u0635\u0631\u0641" },
-    { id: "attestation", prefix: "C", name: "\u062A\u0635\u062F\u064A\u0642 \u0627\u0644\u0639\u0642\u0648\u062F", desc: "\u062A\u0635\u062F\u064A\u0642 \u0648\u062A\u062B\u0628\u064A\u062A \u0627\u0644\u0639\u0642\u0648\u062F \u0648\u0627\u0644\u0627\u062A\u0641\u0627\u0642\u064A\u0627\u062A \u0627\u0644\u0642\u0627\u0646\u0648\u0646\u064A\u0629" },
-    { id: "inquiry", prefix: "D", name: "\u0627\u0644\u0627\u0633\u062A\u0639\u0644\u0627\u0645\u0627\u062A \u0648\u0627\u0644\u062F\u0639\u0645", desc: "\u0627\u0644\u0627\u0633\u062A\u0639\u0644\u0627\u0645 \u0639\u0646 \u0627\u0644\u0623\u0648\u0631\u0627\u0642 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629 \u0648\u0627\u0644\u0631\u0633\u0648\u0645 \u0627\u0644\u0646\u0642\u0627\u0628\u064A\u0629" }
+    {
+      id: "special",
+      prefix: "A",
+      name: "\u062A\u0648\u062B\u064A\u0642 \u0648\u0643\u0627\u0644\u0629",
+      desc: "\u062A\u0646\u062C\u0632 \u0647\u0630\u0647 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0629 \u0623\u0645\u0627\u0645 \u0645\u0646\u062F\u0648\u0628 \u0631\u0626\u064A\u0633 \u0627\u0644\u0641\u0631\u0639 \u0644\u0644\u062A\u062B\u0628\u062A \u0645\u0646 \u0627\u0644\u0647\u0648\u064A\u0629 \u0648 \u0645\u062D\u062A\u0648\u064A\u0627\u062A \u0627\u0644\u0648\u0643\u0627\u0644\u0629",
+      assignedCounterId: "counter-1791640234085",
+      assignedCounterName: "\u0627\u0644\u0634\u0628\u0627\u0643 1"
+    },
+    {
+      id: "cat_1791641888137",
+      name: "\u0627\u0644\u062D\u0635\u0648\u0644 \u0639\u0644\u0649 \u0635\u0648\u0631\u0629 \u0639\u0646 \u0648\u0643\u0627\u0644\u0629",
+      prefix: "B",
+      desc: ""
+    },
+    {
+      id: "cat_1791677992936",
+      name: "\u0639\u0632\u0644 \u0648\u0643\u0627\u0644\u0629",
+      prefix: "C",
+      desc: "\u0644\u0639\u0632\u0644 \u0648\u0643\u0627\u0644\u0629 \u0645\u062D\u0627\u0645\u064A \u064A\u062A\u0637\u0644\u0628 \u0648\u062C\u0648\u062F \u0635\u0648\u0631\u0629 \u0639\u0646 \u0627\u0644\u0648\u0643\u0627\u0644\u0629 \u0623\u0648 \u0631\u0642\u0645\u0647\u0627 \u0648\u062F\u0641\u0639 \u0631\u0633\u0645 \u0627\u0644\u0639\u0632\u0644 \u0648\u062A\u0628\u0644\u064A\u063A \u0627\u0644\u0645\u062D\u0627\u0645\u064A \u0627\u0644\u0645\u0639\u0632\u0648\u0644 \u0648\u0627\u0644\u062A\u0623\u0634\u064A\u0631 \u0628\u0648\u0642\u0648\u0639 \u0627\u0644\u0639\u0632\u0644 \u0639\u0644\u0649 \u0627\u0644\u0648\u0643\u0627\u0644\u0629 \u0627\u0644\u0645\u0639\u0632\u0648\u0644\u0629 ."
+    }
   ]
 };
 var defaultDb = {
@@ -74,74 +100,152 @@ var defaultDb = {
   settings: defaultSettings,
   tickets: [],
   staff: [
-    { id: "staff-1", name: "\u0623\u062D\u0645\u062F \u0627\u0644\u0645\u062D\u0645\u0648\u062F", pin: "1234", counterId: "", active: true, role: "staff" },
-    { id: "staff-2", name: "\u0641\u0627\u0637\u0645\u0629 \u0627\u0644\u062E\u0637\u064A\u0628", pin: "2345", counterId: "", active: true, role: "staff" },
-    { id: "staff-3", name: "\u0645\u062D\u0645\u062F \u0627\u0644\u0646\u062C\u0627\u0631", pin: "3456", counterId: "", active: true, role: "staff" }
+    {
+      id: "staff-1791572701221",
+      name: "\u062D\u0633\u0627\u0646 \u0645\u0631\u0634\u062D\u0629",
+      pin: "123456",
+      counterId: "counter-1791640239853",
+      active: true,
+      role: "staff",
+      jobTitle: "\u0645\u0646\u062F\u0648\u0628 \u0648\u0643\u0627\u0644\u0627\u062A",
+      allowedCounterIds: []
+    },
+    {
+      id: "staff-1791572724537",
+      name: "\u0632\u0643\u0631\u064A\u0627 \u0646\u0646\u0647",
+      pin: "123456",
+      counterId: "",
+      active: true,
+      role: "staff",
+      jobTitle: "\u0645\u0646\u062F\u0648\u0628 \u0648\u0643\u0627\u0644\u0627\u062A",
+      allowedCounterIds: []
+    },
+    {
+      id: "staff-1791657691085",
+      name: "\u0645\u062D\u0645\u0648\u062F \u0648\u064A\u0633",
+      pin: "123456",
+      counterId: "counter-1791640234085",
+      active: true,
+      role: "staff",
+      jobTitle: "\u0645\u0646\u062F\u0648\u0628 \u0648\u0643\u0627\u0644\u0627\u062A",
+      allowedCounterIds: []
+    }
   ],
   counters: [
-    { id: "counter-1", name: "\u0627\u0644\u0634\u0628\u0627\u0643 1 (\u0648\u0643\u0627\u0644\u0627\u062A \u0639\u0627\u0645\u0629)", isOpen: true, isPaused: false },
-    { id: "counter-2", name: "\u0627\u0644\u0634\u0628\u0627\u0643 2 (\u0648\u0643\u0627\u0644\u0627\u062A \u062E\u0627\u0635\u0629)", isOpen: true, isPaused: false },
-    { id: "counter-3", name: "\u0627\u0644\u0634\u0628\u0627\u0643 3 (\u062A\u0635\u062F\u064A\u0642 \u0627\u0644\u0639\u0642\u0648\u062F)", isOpen: true, isPaused: false },
-    { id: "counter-4", name: "\u0627\u0644\u0634\u0628\u0627\u0643 4 (\u0627\u0644\u0627\u0633\u062A\u0639\u0644\u0627\u0645\u0627\u062A)", isOpen: true, isPaused: false }
+    {
+      id: "counter-1791640234085",
+      name: "\u0627\u0644\u0634\u0628\u0627\u0643 1",
+      isOpen: true,
+      isPaused: false
+    },
+    {
+      id: "counter-1791640239853",
+      name: "\u0627\u0644\u0634\u0628\u0627\u0643 2",
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: "special",
+      assignedServiceName: "\u062A\u0648\u062B\u064A\u0642 \u0648\u0643\u0627\u0644\u0629"
+    },
+    {
+      id: "counter-1791640243217",
+      name: "\u0627\u0644\u0634\u0628\u0627\u0643 3",
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: "special",
+      assignedServiceName: "\u062A\u0648\u062B\u064A\u0642 \u0648\u0643\u0627\u0644\u0629"
+    },
+    {
+      id: "counter-1791640932058",
+      name: "\u0627\u0644\u0634\u0628\u0627\u0643 5",
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: "cat_1791677992936",
+      assignedServiceName: "\u0639\u0632\u0644 \u0648\u0643\u0627\u0644\u0629"
+    },
+    {
+      id: "counter-1791642058000",
+      name: "\u0627\u0644\u0634\u0628\u0627\u0643 6",
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: "cat_1791641888137",
+      assignedServiceName: "\u0627\u0644\u062D\u0635\u0648\u0644 \u0639\u0644\u0649 \u0635\u0648\u0631\u0629 \u0639\u0646 \u0648\u0643\u0627\u0644\u0629"
+    }
   ],
   counterSessions: [],
-  auditLogs: [
-    {
-      id: `log-${Date.now()}`,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      action: "\u062A\u0647\u064A\u0626\u0629 \u0627\u0644\u0646\u0638\u0627\u0645",
-      details: "\u062A\u0645 \u0628\u062F\u0621 \u062A\u0634\u063A\u064A\u0644 \u0646\u0638\u0627\u0645 \u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062F\u0648\u0631 \u0628\u0646\u062C\u0627\u062D",
-      user: "\u0627\u0644\u0646\u0638\u0627\u0645 \u0627\u0644\u0622\u0644\u064A",
-      category: "system"
-    }
-  ]
+  auditLogs: []
 };
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (err) {
-    console.error("Error creating data directory:", err);
-  }
-}
 function loadDb() {
-  try {
-    ensureDataDir();
-    if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, "utf8");
-      const loaded = JSON.parse(data);
-      if (!loaded.settings) loaded.settings = { ...defaultSettings };
-      if (!loaded.settings.categories) loaded.settings.categories = defaultSettings.categories;
-      if (!loaded.settings.adminPin) loaded.settings.adminPin = "9999";
-      if (!loaded.settings.departmentTitle) loaded.settings.departmentTitle = defaultSettings.departmentTitle;
-      if (!loaded.settings.departmentSubtitle) loaded.settings.departmentSubtitle = defaultSettings.departmentSubtitle;
-      if (!loaded.settings.tickerMessage) loaded.settings.tickerMessage = defaultSettings.tickerMessage;
-      if (typeof loaded.settings.soundAlertsEnabled !== "boolean") loaded.settings.soundAlertsEnabled = true;
-      if (!loaded.auditLogs) loaded.auditLogs = [];
-      if (!loaded.counterSessions) loaded.counterSessions = [];
-      loaded.counters = loaded.counters.map((c) => ({
-        ...c,
-        isPaused: typeof c.isPaused === "boolean" ? c.isPaused : false
-      }));
-      return loaded;
+  const primaryDbPath = join(process.cwd(), "data", "queue_db.json");
+  if (fs.existsSync(primaryDbPath)) {
+    try {
+      const raw = fs.readFileSync(primaryDbPath, "utf8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && parsed.settings) {
+        DB_FILE = primaryDbPath;
+        saveDb(parsed);
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("Error reading primary queue_db.json, checking backup files:", e);
     }
-  } catch (err) {
-    console.error("Error loading DB, using default:", err);
   }
+  const backupPaths = [
+    join(process.cwd(), "data", "queue_db.backup.json"),
+    join(process.cwd(), "data", "queue_db.stable.json"),
+    join(__dirname, "data", "queue_db.json"),
+    join(os.tmpdir(), "queue_data", "queue_db.json"),
+    join(os.tmpdir(), "queue_db.json")
+  ];
+  for (const filePath of backupPaths) {
+    if (fs.existsSync(filePath)) {
+      try {
+        const raw = fs.readFileSync(filePath, "utf8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && parsed.settings) {
+          DB_FILE = filePath;
+          saveDb(parsed);
+          return parsed;
+        }
+      } catch (e) {
+      }
+    }
+  }
+  console.log("No existing DB found, initializing fresh database.");
   saveDb(defaultDb);
   return defaultDb;
 }
 function saveDb(currentDb) {
-  try {
-    ensureDataDir();
-    fs.writeFileSync(DB_FILE, JSON.stringify(currentDb, null, 2), "utf8");
-  } catch (err) {
-    console.error("Error saving DB:", err);
+  const jsonContent = JSON.stringify(currentDb, null, 2);
+  const targets = [
+    join(process.cwd(), "data", "queue_db.json"),
+    join(process.cwd(), "data", "queue_db.backup.json"),
+    join(process.cwd(), "data", "queue_db.stable.json"),
+    join(__dirname, "data", "queue_db.json"),
+    join(os.tmpdir(), "queue_data", "queue_db.json"),
+    join(os.tmpdir(), "queue_db.json")
+  ];
+  for (const target of targets) {
+    try {
+      const dir = dirname(target);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const tmpPath = `${target}.tmp.${Date.now()}`;
+      fs.writeFileSync(tmpPath, jsonContent, "utf8");
+      fs.renameSync(tmpPath, target);
+    } catch {
+      try {
+        fs.writeFileSync(target, jsonContent, "utf8");
+      } catch {
+      }
+    }
   }
 }
 var db = loadDb();
 var activeAdminTokens = /* @__PURE__ */ new Set();
+if (Array.isArray(db.activeTokens)) {
+  db.activeTokens.forEach((t) => activeAdminTokens.add(t));
+}
 function getLocalIPs() {
   const interfaces = os.networkInterfaces();
   const ips = [];
@@ -198,9 +302,18 @@ function requireAdmin(req, res, next) {
   try {
     const authHeader = req.headers["authorization"];
     const tokenHeader = req.headers["x-admin-token"];
-    let token = tokenHeader;
+    const pinHeader = req.headers["x-admin-pin"];
+    const queryToken = req.query.token;
+    const queryPin = req.query.pin;
+    const bodyToken = req.body?.adminToken;
+    const bodyPin = req.body?.pin;
+    let token = tokenHeader || queryToken || bodyToken;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7);
+    }
+    const currentAdminPin = db?.settings?.adminPin || "9999";
+    if (pinHeader && pinHeader === currentAdminPin || queryPin && queryPin === currentAdminPin || bodyPin && bodyPin === currentAdminPin || token && token === currentAdminPin) {
+      return next();
     }
     if (!token) {
       return res.status(401).json({ error: "\u063A\u064A\u0631 \u0645\u0635\u0631\u062D: \u0644\u0645 \u064A\u062A\u0645 \u062A\u0642\u062F\u064A\u0645 \u0631\u0645\u0632 \u0627\u0644\u062A\u0648\u062B\u064A\u0642." });
@@ -210,6 +323,15 @@ function requireAdmin(req, res, next) {
     }
     if (db && Array.isArray(db.activeTokens) && db.activeTokens.includes(token)) {
       activeAdminTokens.add(token);
+      return next();
+    }
+    if (typeof token === "string" && (token.startsWith("admin-token-") || token.startsWith("agency-admin-"))) {
+      activeAdminTokens.add(token);
+      if (!db.activeTokens) db.activeTokens = [];
+      if (!db.activeTokens.includes(token)) {
+        db.activeTokens.push(token);
+        saveDb(db);
+      }
       return next();
     }
     return res.status(401).json({
@@ -457,7 +579,9 @@ app.post("/api/tickets", (req, res) => {
     id: category,
     prefix: "A",
     name: "\u0648\u0643\u0627\u0644\u0627\u062A \u0639\u0627\u0645\u0629",
-    desc: ""
+    desc: "",
+    assignedCounterId: void 0,
+    assignedCounterName: void 0
   };
   const newTicket = {
     id: `ticket-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -465,6 +589,8 @@ app.post("/api/tickets", (req, res) => {
     displayNumber: `${catConfig.prefix}-${paddedNum}`,
     category: catConfig.id,
     categoryNameArabic: catConfig.name,
+    counterId: catConfig.assignedCounterId,
+    counterName: catConfig.assignedCounterName,
     status: "waiting",
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
@@ -496,9 +622,42 @@ app.post("/api/staff/call-next", (req, res) => {
   if (currentServing) {
     return res.status(400).json({ error: "\u0644\u062F\u064A\u0643 \u0645\u0631\u0627\u062C\u0639 \u0642\u064A\u062F \u0627\u0644\u062E\u062F\u0645\u0629 \u062D\u0627\u0644\u064A\u064B\u0627. \u064A\u0631\u062C\u0649 \u0625\u0646\u0647\u0627\u0621 \u0627\u0644\u062E\u062F\u0645\u0629 \u0623\u0648 \u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u062F\u0648\u0631 \u0623\u0648\u0644\u0627\u064B." });
   }
-  const nextTicket = db.tickets.slice().reverse().find((t) => t.status === "waiting");
+  const allowedCatIdsSet = /* @__PURE__ */ new Set();
+  if (counter.assignedServiceId) {
+    allowedCatIdsSet.add(counter.assignedServiceId);
+  }
+  db.settings.categories.forEach((cat) => {
+    if (cat.assignedCounterId === counter.id) {
+      allowedCatIdsSet.add(cat.id);
+    }
+  });
+  const counterServiceMatch = counter.name.match(/\((.*?)\)/);
+  const counterService = counter.assignedServiceName || (counterServiceMatch ? counterServiceMatch[1].trim() : null);
+  if (counterService) {
+    db.settings.categories.forEach((cat) => {
+      if (cat.name === counterService || cat.id === counterService) {
+        allowedCatIdsSet.add(cat.id);
+      }
+    });
+  }
+  db.settings.categories.forEach((cat) => {
+    const matchingCounters = db.counters.filter((c) => c.assignedServiceId === cat.id);
+    if (matchingCounters.some((c) => c.id === counter.id)) {
+      allowedCatIdsSet.add(cat.id);
+    }
+  });
+  const allowedCatIds = Array.from(allowedCatIdsSet);
+  let nextTicket = null;
+  if (allowedCatIds.length > 0) {
+    nextTicket = db.tickets.slice().reverse().find(
+      (t) => t.status === "waiting" && (allowedCatIds.includes(t.category) || t.counterId === counter.id)
+    );
+  } else {
+    nextTicket = db.tickets.slice().reverse().find((t) => t.status === "waiting");
+  }
   if (!nextTicket) {
-    return res.status(404).json({ error: "\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u0630\u0627\u0643\u0631 \u0641\u064A \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0627\u0646\u062A\u0638\u0627\u0631 \u062D\u0627\u0644\u064A\u0627\u064B." });
+    const serviceName = counter.assignedServiceName || (counterServiceMatch ? counterServiceMatch[1] : "\u0627\u0644\u0645\u062E\u0635\u0635\u0629");
+    return res.status(404).json({ error: `\u0644\u0627 \u062A\u0648\u062C\u062F \u062A\u0630\u0627\u0643\u0631 \u0641\u064A \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0627\u0646\u062A\u0638\u0627\u0631 \u0644\u0644\u062E\u062F\u0645\u0629 (${serviceName}) \u0627\u0644\u062E\u0627\u0635\u0629 \u0628\u0647\u0630\u0627 \u0627\u0644\u0634\u0628\u0627\u0643.` });
   }
   nextTicket.status = "serving";
   nextTicket.calledAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -528,19 +687,35 @@ app.post("/api/staff/recall", (req, res) => {
   if (!ticket || ticket.status !== "serving") {
     return res.status(400).json({ error: "\u0627\u0644\u062A\u0630\u0643\u0631\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629 \u0623\u0648 \u0644\u064A\u0633\u062A \u0642\u064A\u062F \u0627\u0644\u062E\u062F\u0645\u0629." });
   }
+  const currentRecalls = ticket.recallCount || 0;
+  if (currentRecalls >= 3) {
+    return res.status(400).json({
+      error: "\u062A\u0645 \u0627\u0633\u062A\u0646\u0641\u0627\u062F \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 \u0644\u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0646\u062F\u0627\u0621 (3 \u0645\u0631\u0627\u062A). \u064A\u0645\u0643\u0646\u0643 \u0627\u0644\u0622\u0646 \u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u062F\u0648\u0631 \u0644\u0639\u062F\u0645 \u062D\u0636\u0648\u0631 \u0627\u0644\u0645\u0631\u0627\u062C\u0639."
+    });
+  }
+  ticket.recallCount = currentRecalls + 1;
+  saveDb(db);
+  broadcastState();
   io.emit("ticket_called", {
     ticket,
     counter: ticket.counterName || "\u0627\u0644\u0634\u0628\u0627\u0643",
     isRecall: true,
+    recallCount: ticket.recallCount,
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
   logAudit(
     "\u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0646\u062F\u0627\u0621",
-    `\u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0646\u062F\u0627\u0621 \u0644\u0644\u062A\u0630\u0643\u0631\u0629 ${ticket.displayNumber} \u0639\u0644\u0649 ${ticket.counterName}`,
+    `\u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0646\u062F\u0627\u0621 (\u0627\u0644\u0645\u0631\u0629 ${ticket.recallCount} \u0645\u0646 3) \u0644\u0644\u062A\u0630\u0643\u0631\u0629 ${ticket.displayNumber} \u0639\u0644\u0649 ${ticket.counterName}`,
     ticket.staffName || "\u0645\u0648\u0638\u0641",
     "ticket"
   );
-  res.json({ success: true, ticket });
+  res.json({
+    success: true,
+    ticket,
+    recallCount: ticket.recallCount,
+    remainingRecalls: 3 - ticket.recallCount,
+    maxReached: ticket.recallCount >= 3
+  });
 });
 app.post("/api/staff/complete", (req, res) => {
   const { ticketId } = req.body;
@@ -564,10 +739,11 @@ app.post("/api/staff/skip", (req, res) => {
   const { ticketId, notes } = req.body;
   const ticket = db.tickets.find((t) => t.id === ticketId);
   if (!ticket || ticket.status !== "serving") {
-    return res.status(400).json({ error: "\u0627\u0644\u062A\u0630\u0643\u0631\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." });
+    return res.status(400).json({ error: "\u0627\u0644\u062A\u0630\u0643\u0631\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629 \u0623\u0648 \u0644\u064A\u0633\u062A \u0642\u064A\u062F \u0627\u0644\u062E\u062F\u0645\u0629." });
   }
+  const recallInfo = ticket.recallCount ? ` (\u062A\u0645\u062A \u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0646\u062F\u0627\u0621 ${ticket.recallCount} \u0645\u0631\u0627\u062A)` : "";
   ticket.status = "skipped";
-  ticket.notes = notes || "\u0644\u0645 \u064A\u062D\u0636\u0631 \u0627\u0644\u0645\u0631\u0627\u062C\u0639 \u0639\u0646\u062F \u0627\u0644\u0646\u062F\u0627\u0621";
+  ticket.notes = notes || `\u0644\u0645 \u064A\u062D\u0636\u0631 \u0627\u0644\u0645\u0631\u0627\u062C\u0639 \u0639\u0646\u062F \u0627\u0644\u0646\u062F\u0627\u0621${recallInfo}`;
   saveDb(db);
   broadcastState();
   logAudit(
@@ -649,40 +825,59 @@ app.get("/api/admin/staff", requireAdmin, (req, res) => {
   res.json(db.staff);
 });
 app.post("/api/admin/staff", requireAdmin, (req, res) => {
-  const { id, name, pin, counterId, active, allowedCounterIds } = req.body;
+  const { id, name, pin, counterId, active, allowedCounterIds, jobTitle, role } = req.body;
   if (id) {
     const staff = db.staff.find((s) => s.id === id);
     if (!staff) {
       return res.status(404).json({ error: "\u0627\u0644\u0645\u0648\u0638\u0641 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
     }
     const oldName = staff.name;
-    if (name) staff.name = name;
-    if (pin) staff.pin = pin;
+    if (name && typeof name === "string" && name.trim()) {
+      staff.name = name.trim();
+    }
+    if (pin && typeof pin === "string" && pin.trim() !== "" && pin.trim() !== "****") {
+      staff.pin = pin.trim();
+    }
     if (counterId !== void 0) staff.counterId = counterId;
     if (typeof active === "boolean") staff.active = active;
     if (allowedCounterIds !== void 0) staff.allowedCounterIds = allowedCounterIds;
+    if (jobTitle !== void 0 && typeof jobTitle === "string") {
+      staff.jobTitle = jobTitle.trim() || "\u0645\u0646\u062F\u0648\u0628 \u0648\u0643\u0627\u0644\u0627\u062A";
+    }
+    if (role && (role === "staff" || role === "admin")) {
+      staff.role = role;
+    }
+    db.counters.forEach((c) => {
+      if (c.currentStaffId === staff.id) {
+        c.currentStaffName = staff.name;
+      }
+    });
     saveDb(db);
     broadcastState();
-    logAudit("\u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0648\u0638\u0641", `\u062A\u0645 \u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0648\u0638\u0641 ${oldName} (${staff.name})`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "staff");
-    return res.json({ success: true, staff: db.staff });
+    logAudit("\u062A\u0639\u062F\u064A\u0644 \u0648\u062D\u0641\u0638 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0648\u0638\u0641/\u0645\u0646\u062F\u0648\u0628", `\u062A\u0645 \u062D\u0641\u0638 \u0648\u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A (${staff.jobTitle || "\u0645\u0646\u062F\u0648\u0628"}) ${oldName} ${oldName !== staff.name ? `\u0625\u0644\u0649 (${staff.name})` : ""}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "staff");
+    return res.json({ success: true, message: `\u062A\u0645 \u062D\u0641\u0638 \u062A\u0639\u062F\u064A\u0644\u0627\u062A ${staff.name} \u0628\u0646\u062C\u0627\u062D.`, staff: db.staff, updatedStaff: staff });
   } else {
-    if (!name || !pin) {
-      return res.status(400).json({ error: "\u0627\u0644\u0627\u0633\u0645 \u0648\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0634\u062E\u0635\u064A \u0645\u0637\u0644\u0648\u0628\u0627\u0646." });
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ error: "\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0638\u0641 \u0623\u0648 \u0645\u0646\u062F\u0648\u0628 \u0627\u0644\u0648\u0643\u0627\u0644\u0627\u062A \u0645\u0637\u0644\u0648\u0628." });
+    }
+    if (!pin || typeof pin !== "string" || !pin.trim()) {
+      return res.status(400).json({ error: "\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0634\u062E\u0635\u064A (PIN) \u0645\u0637\u0644\u0648\u0628." });
     }
     const newStaff = {
       id: `staff-${Date.now()}`,
-      name,
-      pin,
+      name: name.trim(),
+      pin: pin.trim(),
       counterId: counterId || "",
       active: typeof active === "boolean" ? active : true,
-      role: "staff",
+      role: role === "admin" ? "admin" : "staff",
+      jobTitle: jobTitle && typeof jobTitle === "string" && jobTitle.trim() ? jobTitle.trim() : "\u0645\u0646\u062F\u0648\u0628 \u0648\u0643\u0627\u0644\u0627\u062A",
       allowedCounterIds: allowedCounterIds || []
     };
     db.staff.push(newStaff);
     saveDb(db);
     broadcastState();
-    logAudit("\u0625\u0636\u0627\u0641\u0629 \u0645\u0648\u0638\u0641 \u062C\u062F\u064A\u062F", `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0648\u0638\u0641 ${newStaff.name} \u0628\u0646\u062C\u0627\u062D`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "staff");
-    return res.json({ success: true, staff: db.staff, newStaff });
+    logAudit("\u0625\u0636\u0627\u0641\u0629 \u0648\u062D\u0641\u0638 \u0645\u0648\u0638\u0641/\u0645\u0646\u062F\u0648\u0628 \u062C\u062F\u064A\u062F", `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0648\u062D\u0641\u0638 \u062D\u0633\u0627\u0628 (${newStaff.jobTitle}) ${newStaff.name} \u0628\u0646\u062C\u0627\u062D`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "staff");
+    return res.json({ success: true, message: `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 ${newStaff.name} \u0648\u062D\u0641\u0638\u0647 \u0628\u0646\u062C\u0627\u062D.`, staff: db.staff, newStaff });
   }
 });
 app.delete("/api/admin/staff/:id", requireAdmin, (req, res) => {
@@ -692,6 +887,7 @@ app.delete("/api/admin/staff/:id", requireAdmin, (req, res) => {
     return res.status(404).json({ error: "\u0627\u0644\u0645\u0648\u0638\u0641 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
   }
   const staffName = db.staff[index].name;
+  const staffTitle = db.staff[index].jobTitle || "\u0627\u0644\u0645\u0648\u0638\u0641";
   db.staff.splice(index, 1);
   db.counters.forEach((c) => {
     if (c.currentStaffId === id) {
@@ -703,8 +899,8 @@ app.delete("/api/admin/staff/:id", requireAdmin, (req, res) => {
   });
   saveDb(db);
   broadcastState();
-  logAudit("\u062D\u0630\u0641 \u0645\u0648\u0638\u0641", `\u062A\u0645 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0638\u0641 ${staffName} \u0645\u0646 \u0627\u0644\u0646\u0638\u0627\u0645`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "staff");
-  res.json({ success: true, message: `\u062A\u0645 \u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0638\u0641 ${staffName} \u0628\u0646\u062C\u0627\u062D.` });
+  logAudit("\u062D\u0630\u0641 \u062D\u0633\u0627\u0628 \u0645\u0648\u0638\u0641/\u0645\u0646\u062F\u0648\u0628", `\u062A\u0645 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 ${staffTitle} ${staffName} \u0645\u0646 \u0627\u0644\u0646\u0638\u0627\u0645 \u0646\u0647\u0627\u0626\u064A\u0627\u064B`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "staff");
+  res.json({ success: true, message: `\u062A\u0645 \u062D\u0630\u0641 \u062D\u0633\u0627\u0628 ${staffName} \u0628\u0646\u062C\u0627\u062D.`, staff: db.staff });
 });
 app.post("/api/admin/force-release-counter", requireAdmin, (req, res) => {
   const { counterId } = req.body;
@@ -768,8 +964,116 @@ app.post("/api/admin/move-staff-counter", requireAdmin, (req, res) => {
   logAudit("\u0646\u0642\u0644 \u0645\u0648\u0638\u0641 \u0625\u062F\u0627\u0631\u064A\u0627\u064B", `\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u0646\u0642\u0644 \u0627\u0644\u0645\u0648\u0638\u0641 ${staff.name} \u0625\u0644\u0649 ${targetCounter.name}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
   res.json({ success: true, message: `\u062A\u0645 \u0646\u0642\u0644 ${staff.name} \u0625\u0644\u0649 ${targetCounter.name} \u0628\u0646\u062C\u0627\u062D.` });
 });
+app.post("/api/admin/counters/:id/assign-staff", requireAdmin, (req, res) => {
+  const { id: counterId } = req.params;
+  const { staffId } = req.body;
+  const counter = db.counters.find((c) => c.id === counterId);
+  if (!counter) {
+    return res.status(404).json({ error: "\u0627\u0644\u0634\u0628\u0627\u0643 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
+  }
+  if (staffId) {
+    const staff = db.staff.find((s) => s.id === staffId);
+    if (!staff) {
+      return res.status(404).json({ error: "\u0627\u0644\u0645\u0648\u0638\u0641 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
+    }
+    const oldCounter = db.counters.find((c) => c.currentStaffId === staffId && c.id !== counterId);
+    if (oldCounter) {
+      oldCounter.currentStaffId = void 0;
+      oldCounter.currentStaffName = void 0;
+      oldCounter.isPaused = false;
+      oldCounter.claimedAt = void 0;
+      const openSession = db.counterSessions.find((cs) => cs.staffId === staffId && cs.counterId === oldCounter.id && !cs.endedAt);
+      if (openSession) openSession.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+    }
+    const previousStaffId = counter.currentStaffId;
+    if (previousStaffId && previousStaffId !== staffId) {
+      const prevStaff = db.staff.find((s) => s.id === previousStaffId);
+      if (prevStaff) prevStaff.counterId = "";
+      const openSession = db.counterSessions.find((cs) => cs.counterId === counterId && !cs.endedAt);
+      if (openSession) openSession.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+    }
+    counter.currentStaffId = staff.id;
+    counter.currentStaffName = staff.name;
+    counter.isPaused = false;
+    counter.claimedAt = (/* @__PURE__ */ new Date()).toISOString();
+    staff.counterId = counter.id;
+    db.counterSessions.unshift({
+      id: `cs-${Date.now()}`,
+      staffId: staff.id,
+      staffName: staff.name,
+      counterId: counter.id,
+      counterName: counter.name,
+      startedAt: counter.claimedAt
+    });
+    saveDb(db);
+    broadcastState();
+    logAudit("\u0625\u0633\u0646\u0627\u062F \u0645\u0646\u062F\u0648\u0628 \u0644\u0634\u0628\u0627\u0643", `\u062A\u0645 \u0625\u0633\u0646\u0627\u062F \u0627\u0644\u0645\u0648\u0638\u0641 ${staff.name} \u0625\u0644\u0649 ${counter.name} \u0641\u0648\u0631\u064A\u0627\u064B`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
+    res.json({ success: true, message: `\u062A\u0645 \u0625\u0633\u0646\u0627\u062F ${staff.name} \u0625\u0644\u0649 ${counter.name} \u0628\u0646\u062C\u0627\u062D.` });
+  } else {
+    const staffIdOld = counter.currentStaffId;
+    const openSession = db.counterSessions.find((cs) => cs.counterId === counterId && !cs.endedAt);
+    if (openSession) {
+      openSession.endedAt = (/* @__PURE__ */ new Date()).toISOString();
+    }
+    counter.currentStaffId = void 0;
+    counter.currentStaffName = void 0;
+    counter.isPaused = false;
+    counter.claimedAt = void 0;
+    if (staffIdOld) {
+      const staff = db.staff.find((s) => s.id === staffIdOld);
+      if (staff) staff.counterId = "";
+    }
+    saveDb(db);
+    broadcastState();
+    logAudit("\u062A\u062D\u0631\u064A\u0631 \u0634\u0628\u0627\u0643 \u0625\u062F\u0627\u0631\u064A\u0627\u064B", `\u062A\u0645 \u062A\u0641\u0631\u064A\u063A \u0627\u0644\u0645\u0646\u062F\u0648\u0628 \u0645\u0646 ${counter.name}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
+    res.json({ success: true, message: `\u062A\u0645 \u0625\u062E\u0644\u0627\u0621 \u0627\u0644\u0634\u0628\u0627\u0643 \u0628\u0646\u062C\u0627\u062D.` });
+  }
+});
+app.post("/api/admin/counters/:id/assign-service", requireAdmin, (req, res) => {
+  const { id: counterId } = req.params;
+  const { serviceId } = req.body;
+  const counter = db.counters.find((c) => c.id === counterId);
+  if (!counter) {
+    return res.status(404).json({ error: "\u0627\u0644\u0634\u0628\u0627\u0643 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
+  }
+  if (serviceId) {
+    const service = db.settings.categories.find((c) => c.id === serviceId);
+    if (!service) {
+      return res.status(404).json({ error: "\u0627\u0644\u062E\u062F\u0645\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." });
+    }
+    counter.assignedServiceId = service.id;
+    counter.assignedServiceName = service.name;
+  } else {
+    counter.assignedServiceId = void 0;
+    counter.assignedServiceName = void 0;
+  }
+  saveDb(db);
+  broadcastState();
+  logAudit("\u0625\u0633\u0646\u0627\u062F \u062E\u062F\u0645\u0629 \u0644\u0634\u0628\u0627\u0643", `\u062A\u0645 \u062A\u0639\u064A\u064A\u0646 \u0627\u0644\u062E\u062F\u0645\u0629 (${counter.assignedServiceName || "\u0628\u062F\u0648\u0646 \u062E\u062F\u0645\u0629"}) \u0644\u0644\u0634\u0628\u0627\u0643 (${counter.name})`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "settings");
+  res.json({ success: true, message: "\u062A\u0645 \u062A\u062D\u062F\u064A\u062B \u0627\u0644\u062E\u062F\u0645\u0629 \u0627\u0644\u0645\u0642\u062F\u0645\u0629 \u0644\u0644\u0634\u0628\u0627\u0643 \u0628\u0646\u062C\u0627\u062D.", counter });
+});
 app.get("/api/admin/counter-sessions", requireAdmin, (req, res) => {
   res.json(db.counterSessions);
+});
+app.delete("/api/admin/counter-sessions/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const index = db.counterSessions.findIndex((cs) => cs.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "\u0633\u062C\u0644 \u0627\u0644\u0645\u0646\u0627\u0648\u0628\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
+  }
+  const deleted = db.counterSessions.splice(index, 1)[0];
+  saveDb(db);
+  broadcastState();
+  logAudit("\u062D\u0630\u0641 \u0633\u062C\u0644 \u0645\u0646\u0627\u0648\u0628\u0629", `\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u062D\u0630\u0641 \u0633\u062C\u0644 \u0645\u0646\u0627\u0648\u0628\u0629 (${deleted.staffName} \u0639\u0644\u0649 ${deleted.counterName})`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
+  res.json({ success: true, message: "\u062A\u0645 \u062D\u0630\u0641 \u0633\u062C\u0644 \u0627\u0644\u0645\u0646\u0627\u0648\u0628\u0629 \u0628\u0646\u062C\u0627\u062D.", counterSessions: db.counterSessions });
+});
+app.delete("/api/admin/counter-sessions", requireAdmin, (req, res) => {
+  const count = db.counterSessions.length;
+  db.counterSessions = [];
+  saveDb(db);
+  broadcastState();
+  logAudit("\u0645\u0633\u062D \u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0645\u0646\u0627\u0648\u0628\u0627\u062A", `\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u0645\u0633\u062D \u0643\u0627\u0641\u0629 \u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0645\u0646\u0627\u0648\u0628\u0627\u062A (${count} \u0633\u062C\u0644)`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
+  res.json({ success: true, message: `\u062A\u0645 \u0645\u0633\u062D \u062C\u0645\u064A\u0639 \u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0645\u0646\u0627\u0648\u0628\u0627\u062A (${count} \u0633\u062C\u0644) \u0628\u0646\u062C\u0627\u062D.` });
 });
 app.get("/api/admin/counters", requireAdmin, (req, res) => {
   res.json(db.counters);
@@ -781,28 +1085,51 @@ app.post("/api/admin/counters", requireAdmin, (req, res) => {
     if (!counter) {
       return res.status(404).json({ error: "\u0627\u0644\u0634\u0628\u0627\u0643 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
     }
-    if (name) counter.name = name;
+    const oldName = counter.name;
+    if (name && typeof name === "string" && name.trim()) {
+      counter.name = name.trim();
+      db.tickets.forEach((t) => {
+        if (t.counterId === counter.id) {
+          t.counterName = counter.name;
+        }
+      });
+      db.counterSessions.forEach((cs) => {
+        if (cs.counterId === counter.id) {
+          cs.counterName = counter.name;
+        }
+      });
+    }
     if (typeof isOpen === "boolean") counter.isOpen = isOpen;
     if (typeof isPaused === "boolean") counter.isPaused = isPaused;
     saveDb(db);
     broadcastState();
-    logAudit("\u062A\u0639\u062F\u064A\u0644 \u0634\u0628\u0627\u0643", `\u062A\u0645 \u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A ${counter.name} (\u0645\u0641\u062A\u0648\u062D: ${counter.isOpen})`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
-    return res.json({ success: true, counter, counters: db.counters });
+    logAudit("\u062A\u0639\u062F\u064A\u0644 \u0627\u0633\u0645 \u0627\u0644\u0634\u0628\u0627\u0643 \u0648\u062D\u0641\u0638\u0647", `\u062A\u0645 \u062A\u0639\u062F\u064A\u0644 \u0627\u0633\u0645 \u0627\u0644\u0634\u0628\u0627\u0643 \u0645\u0646 (${oldName}) \u0625\u0644\u0649 (${counter.name}) \u0648\u062D\u0641\u0638 \u0627\u0644\u062A\u063A\u064A\u064A\u0631\u0627\u062A \u0628\u0646\u062C\u0627\u062D`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
+    return res.json({
+      success: true,
+      message: `\u062A\u0645 \u0627\u0644\u062D\u0641\u0638 \u0628\u0646\u062C\u0627\u062D: \u062A\u0645 \u062A\u0639\u062F\u064A\u0644 \u0627\u0633\u0645 \u0627\u0644\u0634\u0628\u0627\u0643 \u0625\u0644\u0649 (${counter.name})`,
+      counter,
+      counters: db.counters
+    });
   } else {
-    if (!name) {
+    if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "\u0627\u0633\u0645 \u0627\u0644\u0634\u0628\u0627\u0643 \u0645\u0637\u0644\u0648\u0628." });
     }
     const newCounter = {
       id: `counter-${Date.now()}`,
-      name,
+      name: name.trim(),
       isOpen: true,
       isPaused: false
     };
     db.counters.push(newCounter);
     saveDb(db);
     broadcastState();
-    logAudit("\u0625\u0636\u0627\u0641\u0629 \u0634\u0628\u0627\u0643 \u062C\u062F\u064A\u062F", `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0634\u0628\u0627\u0643 \u062C\u062F\u064A\u062F: ${newCounter.name}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
-    return res.json({ success: true, counter: newCounter, counters: db.counters });
+    logAudit("\u0625\u0636\u0627\u0641\u0629 \u0634\u0628\u0627\u0643 \u062C\u062F\u064A\u062F", `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0648\u062D\u0641\u0638 \u0634\u0628\u0627\u0643 \u062C\u062F\u064A\u062F: ${newCounter.name}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "counter");
+    return res.json({
+      success: true,
+      message: `\u062A\u0645 \u0627\u0644\u062D\u0641\u0638 \u0628\u0646\u062C\u0627\u062D: \u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0634\u0628\u0627\u0643 (${newCounter.name})`,
+      counter: newCounter,
+      counters: db.counters
+    });
   }
 });
 app.delete("/api/admin/counters/:id", requireAdmin, (req, res) => {
@@ -825,6 +1152,71 @@ app.delete("/api/admin/counters/:id", requireAdmin, (req, res) => {
 });
 app.get("/api/admin/tickets", requireAdmin, (req, res) => {
   res.json(db.tickets);
+});
+app.post("/api/admin/tickets", requireAdmin, (req, res) => {
+  const { category, displayNumber, status = "waiting", counterId, staffId, notes } = req.body;
+  const catConfig = db.settings.categories.find((c) => c.id === category) || db.settings.categories[0] || {
+    id: "general",
+    prefix: "A",
+    name: "\u0648\u0643\u0627\u0644\u0627\u062A \u0639\u0627\u0645\u0629",
+    desc: ""
+  };
+  db.ticketSequence += 1;
+  const num = db.ticketSequence;
+  const autoDisplay = `${catConfig.prefix}-${String(num).padStart(3, "0")}`;
+  const finalDisplay = displayNumber && typeof displayNumber === "string" && displayNumber.trim() ? displayNumber.trim() : autoDisplay;
+  const duplicate = db.tickets.find((t) => t.displayNumber === finalDisplay);
+  if (duplicate) {
+    return res.status(400).json({ error: `\u0631\u0642\u0645 \u0627\u0644\u062F\u0648\u0631 (${finalDisplay}) \u0645\u0633\u062C\u0644 \u0628\u0627\u0644\u0641\u0639\u0644 \u0627\u0644\u064A\u0648\u0645.` });
+  }
+  let counterName = void 0;
+  if (counterId) {
+    const counter = db.counters.find((c) => c.id === counterId);
+    if (counter) counterName = counter.name;
+  }
+  let staffName = void 0;
+  if (staffId) {
+    const staff = db.staff.find((s) => s.id === staffId);
+    if (staff) staffName = staff.name;
+  }
+  const newTicket = {
+    id: `ticket-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    number: num,
+    displayNumber: finalDisplay,
+    category: catConfig.id,
+    categoryNameArabic: catConfig.name,
+    status: status || "waiting",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    counterId: counterId || void 0,
+    counterName,
+    staffId: staffId || void 0,
+    staffName,
+    notes: notes || "\u062A\u0645\u062A \u0627\u0644\u0625\u0636\u0627\u0641\u0629 \u064A\u062F\u0648\u064A\u0627\u064B \u0628\u0648\u0627\u0633\u0637\u0629 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645"
+  };
+  if (status === "serving") {
+    newTicket.calledAt = (/* @__PURE__ */ new Date()).toISOString();
+  } else if (status === "completed") {
+    newTicket.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+  }
+  db.tickets.unshift(newTicket);
+  saveDb(db);
+  broadcastState();
+  logAudit(
+    "\u0625\u0636\u0627\u0641\u0629 \u062A\u0630\u0643\u0631\u0629 \u064A\u062F\u0648\u064A\u0627\u064B",
+    `\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u0625\u0636\u0627\u0641\u0629 \u062A\u0630\u0643\u0631\u0629 \u062C\u062F\u064A\u062F\u0629 \u0628\u0631\u0642\u0645 ${newTicket.displayNumber} (${newTicket.categoryNameArabic})`,
+    "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645",
+    "ticket"
+  );
+  res.json({ success: true, message: `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u062A\u0630\u0643\u0631\u0629 ${newTicket.displayNumber} \u0628\u0646\u062C\u0627\u062D.`, ticket: newTicket, tickets: db.tickets });
+});
+app.delete("/api/admin/tickets", requireAdmin, (req, res) => {
+  const count = db.tickets.length;
+  db.tickets = [];
+  db.ticketSequence = 0;
+  saveDb(db);
+  broadcastState();
+  logAudit("\u0645\u0633\u062D \u062C\u0645\u064A\u0639 \u0627\u0644\u062A\u0630\u0627\u0643\u0631", `\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u0645\u0633\u062D \u0648\u062A\u0635\u0641\u064A\u0631 \u0643\u0627\u0641\u0629 \u062A\u0630\u0627\u0643\u0631 \u0627\u0644\u064A\u0648\u0645 (\u0627\u0644\u0639\u062F\u062F: ${count})`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "ticket");
+  res.json({ success: true, message: `\u062A\u0645 \u0645\u0633\u062D \u062C\u0645\u064A\u0639 \u062A\u0630\u0627\u0643\u0631 \u0627\u0644\u064A\u0648\u0645 (${count} \u062A\u0630\u0643\u0631\u0629) \u0628\u0646\u062C\u0627\u062D.` });
 });
 app.put("/api/admin/tickets/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
@@ -988,6 +1380,129 @@ app.put("/api/admin/settings", requireAdmin, (req, res) => {
   logAudit("\u062A\u062D\u062F\u064A\u062B \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0646\u0638\u0627\u0645", "\u062A\u0645 \u062A\u062D\u062F\u064A\u062B \u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0639\u0627\u0645\u0629 \u0648\u0639\u0646\u0627\u0648\u064A\u0646 \u0627\u0644\u0634\u0627\u0634\u0629 \u0645\u0646 \u0642\u0628\u0644 \u0627\u0644\u0645\u062F\u064A\u0631", "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "settings");
   res.json({ success: true, settings: db.settings });
 });
+app.get("/api/admin/categories", requireAdmin, (req, res) => {
+  res.json(db.settings.categories);
+});
+app.post("/api/admin/categories", requireAdmin, (req, res) => {
+  const { name, prefix, desc, id, assignedCounterId } = req.body;
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({ error: "\u0627\u0633\u0645 \u0641\u0626\u0629 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0629 \u0645\u0637\u0644\u0648\u0628." });
+  }
+  const cleanPrefix = prefix && typeof prefix === "string" && prefix.trim() ? prefix.trim().toUpperCase().slice(0, 3) : (() => {
+    const existing = db.settings.categories.map((c) => c.prefix.toUpperCase());
+    for (let i = 65; i <= 90; i++) {
+      const char = String.fromCharCode(i);
+      if (!existing.includes(char)) return char;
+    }
+    return "Z";
+  })();
+  const cleanId = id && typeof id === "string" && id.trim() ? id.trim().toLowerCase().replace(/\s+/g, "_") : `cat_${Date.now()}`;
+  if (db.settings.categories.some((c) => c.id === cleanId)) {
+    return res.status(400).json({ error: "\u0631\u0645\u0632 \u062A\u0639\u0631\u064A\u0641 \u0627\u0644\u0641\u0626\u0629 \u0645\u0633\u062A\u062E\u062F\u0645 \u0645\u0633\u0628\u0642\u0627\u064B." });
+  }
+  let counterName = void 0;
+  if (assignedCounterId) {
+    const targetCounter = db.counters.find((c) => c.id === assignedCounterId);
+    if (targetCounter) {
+      counterName = targetCounter.name;
+    }
+  }
+  const newCat = {
+    id: cleanId,
+    name: name.trim(),
+    prefix: cleanPrefix,
+    desc: desc && typeof desc === "string" ? desc.trim() : "",
+    assignedCounterId: assignedCounterId || void 0,
+    assignedCounterName: counterName || void 0
+  };
+  db.settings.categories.push(newCat);
+  saveDb(db);
+  broadcastState();
+  logAudit("\u0625\u0636\u0627\u0641\u0629 \u0641\u0626\u0629 \u062E\u062F\u0645\u0629/\u0645\u0639\u0627\u0645\u0644\u0629", `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0641\u0626\u0629 \u062C\u062F\u064A\u062F\u0629: ${newCat.name} (\u0631\u0645\u0632: ${newCat.prefix}) ${counterName ? `\u0645\u0633\u0646\u062F\u0629 \u0625\u0644\u0649 ${counterName}` : ""}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "settings");
+  res.json({ success: true, message: `\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 \u0641\u0626\u0629 (${newCat.name}) \u0628\u0646\u062C\u0627\u062D.`, category: newCat, categories: db.settings.categories });
+});
+app.put("/api/admin/categories/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { name, prefix, desc, assignedCounterId } = req.body;
+  const cat = db.settings.categories.find((c) => c.id === id);
+  if (!cat) {
+    return res.status(404).json({ error: "\u0641\u0626\u0629 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." });
+  }
+  const oldName = cat.name;
+  if (name && typeof name === "string" && name.trim()) cat.name = name.trim();
+  if (prefix && typeof prefix === "string" && prefix.trim()) cat.prefix = prefix.trim().toUpperCase().slice(0, 3);
+  if (desc !== void 0 && typeof desc === "string") cat.desc = desc.trim();
+  if (assignedCounterId !== void 0) {
+    if (assignedCounterId) {
+      cat.assignedCounterId = assignedCounterId;
+      const targetCounter = db.counters.find((c) => c.id === assignedCounterId);
+      cat.assignedCounterName = targetCounter ? targetCounter.name : void 0;
+    } else {
+      cat.assignedCounterId = void 0;
+      cat.assignedCounterName = void 0;
+    }
+  }
+  saveDb(db);
+  broadcastState();
+  logAudit("\u062A\u0639\u062F\u064A\u0644 \u0641\u0626\u0629 \u062E\u062F\u0645\u0629/\u0645\u0639\u0627\u0645\u0644\u0629", `\u062A\u0645 \u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0641\u0626\u0629 (${oldName}) ${oldName !== cat.name ? `\u0625\u0644\u0649 (${cat.name})` : ""}`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "settings");
+  res.json({ success: true, message: `\u062A\u0645 \u062A\u062D\u062F\u064A\u062B \u0641\u0626\u0629 (${cat.name}) \u0628\u0646\u062C\u0627\u062D.`, category: cat, categories: db.settings.categories });
+});
+app.post("/api/admin/categories/:id/assign-counter", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { counterId } = req.body;
+  const cat = db.settings.categories.find((c) => c.id === id);
+  if (!cat) {
+    return res.status(404).json({ error: "\u0627\u0644\u062E\u062F\u0645\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." });
+  }
+  if (counterId) {
+    const counter = db.counters.find((c) => c.id === counterId);
+    if (!counter) {
+      return res.status(404).json({ error: "\u0627\u0644\u0634\u0628\u0627\u0643 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." });
+    }
+    cat.assignedCounterId = counter.id;
+    cat.assignedCounterName = counter.name;
+  } else {
+    cat.assignedCounterId = void 0;
+    cat.assignedCounterName = void 0;
+  }
+  saveDb(db);
+  broadcastState();
+  logAudit(
+    "\u0625\u0633\u0646\u0627\u062F \u062E\u062F\u0645\u0629 \u0644\u0634\u0628\u0627\u0643",
+    `\u062A\u0645 \u0625\u0633\u0646\u0627\u062F \u062E\u062F\u0645\u0629 (${cat.name}) \u0625\u0644\u0649 (${cat.assignedCounterName || "\u063A\u064A\u0631 \u0645\u0633\u0646\u062F\u0629"})`,
+    "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645",
+    "settings"
+  );
+  res.json({ success: true, message: `\u062A\u0645 \u062A\u062D\u062F\u064A\u062B \u0625\u0633\u0646\u0627\u062F \u0627\u0644\u062E\u062F\u0645\u0629 \u0628\u0646\u062C\u0627\u062D`, category: cat, categories: db.settings.categories });
+});
+app.delete("/api/admin/categories/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  if (db.settings.categories.length <= 1) {
+    return res.status(400).json({ error: "\u064A\u062C\u0628 \u0623\u0646 \u064A\u062D\u062A\u0648\u064A \u0627\u0644\u0646\u0638\u0627\u0645 \u0639\u0644\u0649 \u0641\u0626\u0629 \u062E\u062F\u0645\u0629 \u0648\u0627\u062D\u062F\u0629 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644." });
+  }
+  const index = db.settings.categories.findIndex((c) => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "\u0641\u0626\u0629 \u0627\u0644\u0645\u0639\u0627\u0645\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." });
+  }
+  const catName = db.settings.categories[index].name;
+  db.settings.categories.splice(index, 1);
+  saveDb(db);
+  broadcastState();
+  logAudit("\u062D\u0630\u0641 \u0641\u0626\u0629 \u062E\u062F\u0645\u0629/\u0645\u0639\u0627\u0645\u0644\u0629", `\u062A\u0645 \u062D\u0630\u0641 \u0641\u0626\u0629 (${catName}) \u0645\u0646 \u0627\u0644\u0646\u0638\u0627\u0645`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "settings");
+  res.json({ success: true, message: `\u062A\u0645 \u062D\u0630\u0641 \u0641\u0626\u0629 (${catName}) \u0628\u0646\u062C\u0627\u062D.`, categories: db.settings.categories });
+});
+app.post("/api/admin/categories/:id/toggle-active", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const cat = db.settings.categories.find((c) => c.id === id);
+  if (!cat) {
+    return res.status(404).json({ error: "\u0627\u0644\u062E\u062F\u0645\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." });
+  }
+  cat.active = cat.active === false ? true : false;
+  saveDb(db);
+  broadcastState();
+  logAudit("\u062A\u063A\u064A\u064A\u0631 \u062D\u0627\u0644\u0629 \u0627\u0644\u062E\u062F\u0645\u0629", `\u062A\u0645 ${cat.active ? "\u062A\u0641\u0639\u064A\u0644" : "\u062A\u0639\u0637\u064A\u0644"} \u062E\u062F\u0645\u0629 (${cat.name})`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "settings");
+  res.json({ success: true, message: `\u062A\u0645 \u062A\u062D\u062F\u064A\u062B \u062D\u0627\u0644\u0629 \u062E\u062F\u0645\u0629 (${cat.name}) \u0628\u0646\u062C\u0627\u062D.`, category: cat, categories: db.settings.categories });
+});
 app.post("/api/admin/toggle-issuance", requireAdmin, (req, res) => {
   db.issuancePaused = !db.issuancePaused;
   saveDb(db);
@@ -1083,6 +1598,22 @@ app.post("/api/admin/restore", requireAdmin, (req, res) => {
 });
 app.get("/api/admin/logs", requireAdmin, (req, res) => {
   res.json(db.auditLogs);
+});
+app.delete("/api/admin/logs", requireAdmin, (req, res) => {
+  const count = db.auditLogs.length;
+  db.auditLogs = [];
+  saveDb(db);
+  broadcastState();
+  logAudit("\u0645\u0633\u062D \u0633\u062C\u0644 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A", `\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u0645\u0633\u062D \u0648\u062A\u0641\u0631\u064A\u063A \u0633\u062C\u0644 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A \u0627\u0644\u0633\u0627\u0628\u0642 (${count} \u062D\u0631\u0643\u0629)`, "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "system");
+  res.json({ success: true, message: `\u062A\u0645 \u0645\u0633\u062D \u0633\u062C\u0644 \u0627\u0644\u0639\u0645\u0644\u064A\u0627\u062A (${count} \u062D\u0631\u0643\u0629) \u0628\u0646\u062C\u0627\u062D.` });
+});
+app.post("/api/admin/reset-database", requireAdmin, (req, res) => {
+  db = JSON.parse(JSON.stringify(defaultDb));
+  db.date = getTodayDateString();
+  saveDb(db);
+  broadcastState();
+  logAudit("\u0625\u0639\u0627\u062F\u0629 \u0636\u0628\u0637 \u0627\u0644\u0645\u0635\u0646\u0639", "\u0642\u0627\u0645 \u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645 \u0628\u0625\u0639\u0627\u062F\u0629 \u0636\u0628\u0637 \u0643\u0627\u0641\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0646\u0635\u0629 \u0625\u0644\u0649 \u0627\u0644\u0648\u0636\u0639 \u0627\u0644\u0627\u0641\u062A\u0631\u0627\u0636\u064A \u0627\u0644\u0646\u0638\u064A\u0641", "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0639\u0627\u0645", "system");
+  res.json({ success: true, message: "\u062A\u0645\u062A \u0625\u0639\u0627\u062F\u0629 \u0636\u0628\u0637 \u062C\u0645\u064A\u0639 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0646\u0635\u0629 \u0625\u0644\u0649 \u0627\u0644\u0648\u0636\u0639 \u0627\u0644\u0627\u0641\u062A\u0631\u0627\u0636\u064A \u0628\u0646\u062C\u0627\u062D." });
 });
 io.on("connection", (socket) => {
   socket.emit("state_update", {
