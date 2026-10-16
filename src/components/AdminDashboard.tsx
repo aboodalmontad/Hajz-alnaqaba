@@ -50,6 +50,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import type { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
+import { clearAppCache } from '../utils/cache';
 import { Kiosk } from './Kiosk';
 
 interface AdminDashboardProps {
@@ -297,6 +298,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setAuthError(err.message || 'رمز الدخول غير صحيح.');
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const [clearingCache, setClearingCache] = useState(false);
+
+  const handleClearCacheAndReload = async () => {
+    if (!window.confirm('هل تريد مسح جميع ملفات الذاكرة المؤقتة (الكاش) وإعادة تحميل أحدث نسخة نظيفة من الموقع؟')) {
+      return;
+    }
+    setClearingCache(true);
+    try {
+      await clearAppCache({ hardReload: true });
+    } catch {
+      window.location.reload();
     }
   };
 
@@ -1005,6 +1020,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {authLoading ? 'جارِ التحقق...' : 'تسجيل دخول المدير العام'}
             </button>
           </form>
+
+          {/* زر مسح الكاش وإعادة تحميل كامل الموقع نظيف */}
+          <div className="pt-4 border-t border-slate-100 text-center">
+            <button
+              type="button"
+              onClick={handleClearCacheAndReload}
+              disabled={clearingCache}
+              className="w-full py-3 px-4 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-amber-50 hover:to-amber-100 text-slate-700 hover:text-amber-900 font-bold rounded-xl shadow-sm border border-slate-300 hover:border-amber-400 transition-all text-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <RotateCcw className={`w-4 h-4 text-amber-600 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ تفريغ الكاش وإعادة التحميل...' : 'مسح الكاش وإعادة تحميل كامل الموقع نظيف'}</span>
+            </button>
+            <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+              يُفرغ ملفات الذاكرة المؤقتة (Service Worker & Cache) ومخزن المتصفح ويجلب أحدث نسخة نظيفة من السيرفر لحل أي تعارض بالملفات القديمة.
+            </p>
+          </div>
         </div>
       </div>
     );

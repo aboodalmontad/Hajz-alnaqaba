@@ -16,10 +16,12 @@ import {
   ArrowRight,
   Sparkles,
   Server,
-  FileText
+  FileText,
+  RotateCcw
 } from 'lucide-react';
 import { Staff, Counter, Branch, BranchManagerUser } from '../types';
 import { apiFetch } from '../utils/network';
+import { clearAppCache } from '../utils/cache';
 
 interface LoginHomeProps {
   onLoginSuccess: (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string }) => void;
@@ -133,6 +135,19 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
+
+  const handleClearCacheAndReload = async () => {
+    if (!window.confirm('هل تريد مسح جميع ملفات الذاكرة المؤقتة (الكاش) وإعادة تحميل أحدث نسخة نظيفة من الموقع؟')) {
+      return;
+    }
+    setClearingCache(true);
+    try {
+      await clearAppCache({ hardReload: true });
+    } catch {
+      window.location.reload();
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -502,9 +517,25 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
           </button>
         </form>
 
+        {/* زر مسح الكاش وإعادة تحميل كامل الموقع نظيف */}
+        <div className="px-6 pb-6 pt-0">
+          <button
+            type="button"
+            onClick={handleClearCacheAndReload}
+            disabled={clearingCache}
+            className="w-full py-3.5 px-4 bg-slate-950/80 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-bold rounded-2xl shadow-md border border-slate-700/80 hover:border-amber-500/50 transition-all text-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
+          >
+            <RotateCcw className={`w-4 h-4 text-amber-400 ${clearingCache ? 'animate-spin' : ''}`} />
+            <span>{clearingCache ? 'جارِ مسح الكاش وتحديث الموقع...' : 'مسح الكاش وإعادة تحميل كامل الموقع نظيف'}</span>
+          </button>
+          <p className="text-[11px] text-slate-400 text-center mt-2 leading-relaxed">
+            يُفرغ ملفات التخزين المؤقت (Service Worker & Cache) ومخزن المتصفح ويجلب أحدث نسخة محدثة من الموقع لحل أي تعارض أو أخطاء برمجية سابقة.
+          </p>
+        </div>
+
         {/* Footer info */}
         <div className="p-4 bg-slate-950 border-t border-slate-800 text-center text-[11px] text-slate-500">
-          يعمل النظام محلياً بالكامل دون الحاجة للاتترنت (أوفلاين) مع دعم المزامنة السحابية اختيارياً.
+          يعمل النظام محلياً بالكامل دون الحاجة للانترنت (أوفلاين) مع دعم المزامنة السحابية اختيارياً.
         </div>
       </div>
     </div>
