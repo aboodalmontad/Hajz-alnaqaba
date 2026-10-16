@@ -2562,7 +2562,9 @@ app.post('/api/sync/pull-hq', async (req, res) => {
 });
 
 // Download full backup as ZIP
-import archiver from 'archiver';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const archiver = require('archiver');
 
 app.get('/api/backup/download', async (req, res) => {
   try {

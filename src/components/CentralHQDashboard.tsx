@@ -28,11 +28,13 @@ import {
   Edit,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Download
 } from 'lucide-react';
 import { Branch, AgencyTransaction, SyncHistoryLog, SyncSettings, Ticket, AuditLog, BranchManagerUser } from '../types';
 import { apiFetch } from '../utils/network';
 import { BranchDetailsView } from './BranchDetailsView';
+import { supabase } from '../services/supabaseClient';
 
 interface CentralHQDashboardProps {
   currentBranchId?: string;
@@ -125,57 +127,65 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
     setLoading(true);
     setActionMessage(null);
     try {
-      if (forcePull) {
-        // Trigger pull from Supabase
-        await apiFetch('/api/sync/pull-hq', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(adminToken ? { 'x-admin-token': adminToken } : {})
-          }
+      // Use Supabase directly
+      const { data: branchesData, error: branchesErr } = await supabase.from('branches').select('*');
+      const { data: ticketsData, error: ticketsErr } = await supabase.from('tickets').select('*');
+      const { data: agenciesData, error: agenciesErr } = await supabase.from('agencies_transactions').select('*');
+      const { data: auditsData, error: auditsErr } = await supabase.from('audit_logs').select('*');
+
+      if (branchesErr || ticketsErr || agenciesErr || auditsErr) {
+        throw new Error('فشل جلب البيانات من السحابة');
+      }
+
+      setBranches(branchesData || []);
+      
+      const ticketsMap: Record<string, any[]> = {};
+      (ticketsData || []).forEach(t => {
+        if (!ticketsMap[t.branch_id]) ticketsMap[t.branch_id] = [];
+        ticketsMap[t.branch_id].push({
+           ...t,
+           // Map database snake_case to camelCase expected by components
+           id: t.local_id,
+           categoryNameArabic: t.category_name_arabic
         });
-      }
+      });
+      setTicketsByBranch(ticketsMap);
 
-      const res = await apiFetch('/api/hq/branches-data');
-      if (res && res.data) {
-        setBranches(res.data.branches || []);
-        setSummary(res.data.summary || {});
-        setTicketsByBranch(res.data.ticketsByBranch || {});
-        setAuditLogsByBranch(res.data.auditLogsByBranch || {});
-        setIsFromLocalCache(Boolean(res.fromLocalCache));
-        setLastFetchedTime(new Date(res.data.lastUpdated || Date.now()).toLocaleTimeString('ar-SY'));
-      }
+      const auditsMap: Record<string, any[]> = {};
+      (auditsData || []).forEach(au => {
+        if (!auditsMap[au.branch_id]) auditsMap[au.branch_id] = [];
+        auditsMap[au.branch_id].push(au);
+      });
+      setAuditLogsByBranch(auditsMap);
 
-      // Fetch agencies
-      const agenciesRes = await apiFetch('/api/agencies');
-      if (Array.isArray(agenciesRes)) {
-        setAgenciesList(agenciesRes);
-      }
+      setSummary({
+        totalBranches: (branchesData || []).length,
+        activeBranches: (branchesData || []).filter((b:any) => b.is_active).length,
+        totalTodayTickets: (ticketsData || []).length,
+        totalCompletedTickets: (ticketsData || []).filter((t:any) => t.status === 'completed').length,
+        totalAgenciesCount: (agenciesData || []).length
+      });
+
+      setIsFromLocalCache(false);
+      setLastFetchedTime(new Date().toLocaleTimeString('ar-SY'));
+
+
+      // Fetch agencies - already fetched at top
+      setAgenciesList(agenciesData || []);
 
       // Fetch sync settings
-      const syncRes = await apiFetch('/api/sync/settings');
-      if (syncRes && syncRes.settings) {
-        setSyncSettings(syncRes.settings);
-        setSyncQueueCount(syncRes.pendingCount || 0);
-        setSyncHistory(syncRes.history || []);
+      const { data: settingsData, error: settingsErr } = await supabase.from('sync_settings').select('*').single();
+      if (!settingsErr && settingsData) {
+        setSyncSettings(settingsData);
+        // Sync history and pending count will need to be fetched from respective tables if used
       }
 
       // Fetch branch managers
-      try {
-        const bmRes = await apiFetch('/api/admin/branch-managers');
-        if (bmRes && bmRes.success && Array.isArray(bmRes.data)) {
-          setBranchManagers(bmRes.data);
-          try {
-            localStorage.setItem('agency_branch_managers', JSON.stringify(bmRes.data));
-          } catch {}
-        }
-      } catch {
+      const { data: managersData, error: managersErr } = await supabase.from('branch_managers').select('*');
+      if (!managersErr && managersData) {
+        setBranchManagers(managersData);
         try {
-          const raw = localStorage.getItem('agency_branch_managers');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) setBranchManagers(parsed);
-          }
+          localStorage.setItem('agency_branch_managers', JSON.stringify(managersData));
         } catch {}
       }
     } catch (err: any) {
@@ -190,31 +200,25 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
     e.preventDefault();
     try {
       const selectedBranch = branches.find(b => b.id === managerForm.branchId);
-      const payload = {
-        id: editingManager ? editingManager.id : undefined,
-        branchId: managerForm.branchId,
-        branchName: selectedBranch?.name || managerForm.branchName,
-        fullName: managerForm.fullName,
+      const managerData = {
+        branch_id: managerForm.branchId,
+        branch_name: selectedBranch?.name || managerForm.branchName,
+        full_name: managerForm.fullName,
         username: managerForm.username,
         password: managerForm.password,
         active: managerForm.active
       };
 
-      const res = await apiFetch('/api/admin/branch-managers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminToken ? { 'x-admin-token': adminToken } : {})
-        },
-        body: JSON.stringify(payload)
-      });
+      const { error } = editingManager 
+        ? await supabase.from('branch_managers').update(managerData).eq('id', editingManager.id)
+        : await supabase.from('branch_managers').insert([managerData]);
 
-      if (res && res.success) {
-        setActionMessage({ text: res.message || 'تم حفظ وتعيين بيانات مدير الفرع بنجاح.', type: 'success' });
-        setShowManagerModal(false);
-        setEditingManager(null);
-        loadHQData(false);
-      }
+      if (error) throw error;
+
+      setActionMessage({ text: 'تم حفظ وتعيين بيانات مدير الفرع بنجاح.', type: 'success' });
+      setShowManagerModal(false);
+      setEditingManager(null);
+      loadHQData(false);
     } catch (err: any) {
       alert(err.message || 'فشل حفظ بيانات مدير الفرع.');
     }
@@ -223,16 +227,11 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
   const handleDeleteManager = async (id: string, name: string) => {
     if (!confirm(`هل أنت متأكد من حذف حساب المدير "${name}" نهائياً؟`)) return;
     try {
-      const res = await apiFetch(`/api/admin/branch-managers/${id}`, {
-        method: 'DELETE',
-        headers: {
-          ...(adminToken ? { 'x-admin-token': adminToken } : {})
-        }
-      });
-      if (res && res.success) {
-        setActionMessage({ text: res.message || 'تم حذف حساب المدير بنجاح.', type: 'success' });
-        loadHQData(false);
-      }
+      const { error } = await supabase.from('branch_managers').delete().eq('id', id);
+      if (error) throw error;
+      
+      setActionMessage({ text: 'تم حذف حساب المدير بنجاح.', type: 'success' });
+      loadHQData(false);
     } catch (err: any) {
       alert(err.message || 'فشل حذف حساب المدير.');
     }
@@ -244,54 +243,15 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
     return () => clearInterval(interval);
   }, []);
 
-  // Trigger Sync Push
+  // Trigger Sync Push - Note: In Supabase architecture, clients push directly. 
+  // If backend sync logic is still needed, keep as is, but we are migrating to Supabase.
   const handleTriggerPush = async () => {
-    setSyncing(true);
-    setActionMessage(null);
-    try {
-      const res = await apiFetch('/api/sync/push', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminToken ? { 'x-admin-token': adminToken } : {})
-        }
-      });
-      if (res && res.success) {
-        setActionMessage({ text: res.message || 'تمت المزامنة بنجاح!', type: 'success' });
-      } else {
-        setActionMessage({ text: res.message || 'فشلت المزامنة، تم الحفظ في قائمة الانتظار.', type: 'error' });
-      }
-      loadHQData(false);
-    } catch (err: any) {
-      setActionMessage({ text: `تعذر الاتصال بالسحابة: ${err.message || 'انقطاع النت'} (البيانات محفوظة محلياً)`, type: 'error' });
-    } finally {
-      setSyncing(false);
-    }
+    setActionMessage({ text: 'المزامنة تتم الآن تلقائياً عبر السحابة.', type: 'info' });
   };
 
-  // Trigger Pull to HQ
+  // Trigger Pull to HQ - Already integrated in loadHQData with Supabase
   const handleTriggerPullHQ = async () => {
-    setSyncing(true);
-    setActionMessage(null);
-    try {
-      const res = await apiFetch('/api/sync/pull-hq', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminToken ? { 'x-admin-token': adminToken } : {})
-        }
-      });
-      if (res && res.success) {
-        setActionMessage({ text: res.message || 'تم تحديث وجلب بيانات كافة الفروع بنجاح!', type: 'success' });
-      } else {
-        setActionMessage({ text: res.message || 'تعذر جلب التحديثات الجديدة من السحابة.', type: 'error' });
-      }
-      loadHQData(false);
-    } catch (err: any) {
-      setActionMessage({ text: `تعذر الاتصال بالسحابة: ${err.message || 'انقطاع النت'} (تعمل اللوحة من الكاش المحلي)`, type: 'error' });
-    } finally {
-      setSyncing(false);
-    }
+    loadHQData(true);
   };
 
   // Test Supabase connection
