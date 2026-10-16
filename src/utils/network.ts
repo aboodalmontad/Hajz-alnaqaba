@@ -89,18 +89,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     cache: 'no-store' as RequestCache,
     ...options
   };
-
-  // Prepend API base URL if in production/Vercel
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-  const finalUrl = (baseUrl && url.startsWith('/api')) ? `${baseUrl}${url}` : url;
-
-  let res;
-  try {
-    res = await fetch(finalUrl, fetchOptions);
-  } catch (err: any) {
-    throw new Error('تعذر الاتصال بالخادم/السحابة، يرجى التحقق من اتصال الإنترنت.');
-  }
-
+  const res = await fetch(url, fetchOptions);
   const text = await res.text();
 
   if (!res.ok) {

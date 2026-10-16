@@ -13,8 +13,6 @@ import { Kiosk } from './components/Kiosk';
 import { MainDisplay } from './components/MainDisplay';
 import { StaffPortal } from './components/StaffPortal';
 import { AdminDashboard } from './components/AdminDashboard';
-import { CentralHQDashboard } from './components/CentralHQDashboard';
-import { LoginHome } from './components/LoginHome';
 
 const defaultSettings: SystemSettings = {
   departmentTitle: 'دائرة الوكالات – نقابة المحامين بحلب',
@@ -118,7 +116,7 @@ function savePersistedClientState(data: Partial<PersistedClientState>) {
 }
 
 // URL Router resolver
-function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' | 'hq' {
+function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' {
   if (typeof window === 'undefined') return 'home';
   const path = window.location.pathname.toLowerCase();
   const search = new URLSearchParams(window.location.search);
@@ -143,51 +141,12 @@ function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' | 'hq
   if (path.startsWith('/admin') || search.get('tab') === 'admin' || hash === '#admin') {
     return 'admin';
   }
-  if (path.startsWith('/hq') || search.get('tab') === 'hq' || hash === '#hq') {
-    return 'hq';
-  }
   return 'home';
 }
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'home' | 'kiosk' | 'display' | 'staff' | 'admin' | 'hq'>(getInitialTab);
+  const [currentTab, setCurrentTab] = useState<'home' | 'kiosk' | 'display' | 'staff' | 'admin'>(getInitialTab);
   const [connected, setConnected] = useState(false);
-
-  const [auth, setAuth] = useState<{ role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string } | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = sessionStorage.getItem('agency_auth');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return null;
-  });
-
-  const handleLoginSuccess = (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string }) => {
-    setAuth(authData);
-    try {
-      sessionStorage.setItem('agency_auth', JSON.stringify(authData));
-      if (authData.token) {
-        sessionStorage.setItem('agency_admin_token', authData.token);
-        localStorage.setItem('agency_admin_token', authData.token);
-      }
-    } catch {}
-    if (authData.role === 'hq_admin') handleNavigate('hq');
-    else if (authData.role === 'branch_manager') handleNavigate('admin');
-    else if (authData.role === 'counter_staff' || authData.role === 'agency_delegate') handleNavigate('staff');
-  };
-
-  const handleLogout = () => {
-    setAuth(null);
-    try {
-      sessionStorage.removeItem('agency_auth');
-      sessionStorage.removeItem('agency_admin_token');
-      localStorage.removeItem('agency_admin_token');
-    } catch {}
-    setCurrentTab('home');
-    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-      window.history.pushState({ tab: 'home' }, '', '/');
-    }
-  };
 
   const initialCache = loadPersistedClientState();
   const [tickets, setTickets] = useState<Ticket[]>(() => initialCache?.tickets || []);
@@ -216,75 +175,28 @@ export default function App() {
   const [counterSessions, setCounterSessions] = useState<CounterSession[]>(() => initialCache?.counterSessions || []);
   const [lastCalledTicket, setLastCalledTicket] = useState<{ ticket: Ticket; counter: string; isRecall?: boolean; recallCount?: number; timestamp?: string } | null>(null);
 
-  // Sync with browser back/forward buttons & enforce role security
+  // Sync with browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      const target = getInitialTab();
-      if (auth) {
-        if (auth.role === 'hq_admin' && target !== 'hq' && target !== 'admin' && target !== 'home') {
-          setCurrentTab('hq');
-          return;
-        }
-        if (auth.role === 'branch_manager' && target !== 'admin') {
-          setCurrentTab('admin');
-          return;
-        }
-        if ((auth.role === 'agency_delegate' || auth.role === 'counter_staff') && target !== 'staff' && target !== 'kiosk' && target !== 'display') {
-          setCurrentTab('staff');
-          return;
-        }
-      }
-      setCurrentTab(target);
+      setCurrentTab(getInitialTab());
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [auth]);
+  }, []);
 
-  // Enforce role-based initial routing on mount if auth exists
-  useEffect(() => {
-    if (auth) {
-      const tab = getInitialTab();
-      if (auth.role === 'hq_admin') {
-        if (tab !== 'hq' && tab !== 'admin' && tab !== 'home') {
-          setCurrentTab('hq');
-        }
-      } else if (auth.role === 'branch_manager') {
-        if (tab !== 'admin') {
-          setCurrentTab('admin');
-        }
-      } else if (auth.role === 'agency_delegate' || auth.role === 'counter_staff') {
-        if (tab !== 'staff' && tab !== 'kiosk' && tab !== 'display') {
-          setCurrentTab('staff');
-        }
-      }
-    }
-  }, [auth]);
-
-  // Safe navigation that updates the address bar URL with strict role checks
-  const handleNavigate = useCallback((tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin' | 'hq') => {
-    if (auth) {
-      if (auth.role === 'hq_admin' && tab !== 'hq' && tab !== 'admin' && tab !== 'home') {
-        return;
-      }
-      if (auth.role === 'branch_manager' && tab !== 'admin') {
-        return;
-      }
-      if ((auth.role === 'agency_delegate' || auth.role === 'counter_staff') && tab !== 'staff' && tab !== 'kiosk' && tab !== 'display') {
-        return;
-      }
-    }
+  // Safe navigation that updates the address bar URL
+  const handleNavigate = useCallback((tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => {
     setCurrentTab(tab);
     let targetPath = '/';
     if (tab === 'staff') targetPath = '/agent';
     else if (tab === 'kiosk') targetPath = '/kiosk';
     else if (tab === 'display') targetPath = '/display';
     else if (tab === 'admin') targetPath = '/admin';
-    else if (tab === 'hq') targetPath = '/hq';
 
     if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
       window.history.pushState({ tab }, '', targetPath);
     }
-  }, [auth]);
+  }, []);
 
   const fetchState = useCallback(() => {
     return apiFetch('/api/state')
@@ -408,7 +320,7 @@ export default function App() {
     };
   }, [fetchState]);
 
-  // Client Ticket Actions (With full offline-first fallback)
+  // Client Ticket Actions
   const handleIssueTicket = async (category: string): Promise<Ticket | null> => {
     try {
       const data = await apiFetch('/api/tickets', {
@@ -417,150 +329,51 @@ export default function App() {
         body: JSON.stringify({ category })
       });
       return data;
-    } catch {
-      // Offline fallback: generate ticket locally and persist in local client state
-      const catConfig = settings.categories?.find(c => c.id === category) || { prefix: 'A', name: 'توثيق وكالة' };
-      const currentCatTickets = tickets.filter(t => t.category === category);
-      const nextSeq = currentCatTickets.length + 1;
-      const displayNumber = `${catConfig.prefix || 'A'}-${String(nextSeq).padStart(3, '0')}`;
-      const localTicket: Ticket = {
-        id: `ticket-local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        category,
-        categoryNameArabic: catConfig.name || 'معاملة وكالة',
-        number: nextSeq,
-        displayNumber,
-        status: 'waiting',
-        createdAt: new Date().toISOString()
-      };
-      setTickets(prev => {
-        const updated = [...prev, localTicket];
-        savePersistedClientState({ tickets: updated });
-        return updated;
-      });
-      return localTicket;
+    } catch (err: any) {
+      alert(err.message || 'خطأ في إصدار التذكرة');
+      return null;
     }
   };
 
   const handleCallNext = async (staffId: string, counterId: string) => {
-    try {
-      return await apiFetch('/api/staff/call-next', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId, counterId })
-      });
-    } catch {
-      // Offline fallback: find next waiting ticket and call it locally
-      const counter = counters.find(c => c.id === counterId);
-      const staff = staffList.find(s => s.id === staffId);
-      const nextTicket = tickets.find(t => t.status === 'waiting' && (!counter?.assignedServiceId || t.category === counter.assignedServiceId))
-        || tickets.find(t => t.status === 'waiting');
-      
-      if (!nextTicket) {
-        throw new Error('لا توجد تذاكر انتظار حالياً في الطابور.');
-      }
-
-      const updatedTicket: Ticket = {
-        ...nextTicket,
-        status: 'serving',
-        counterId,
-        counterName: counter?.name || 'شباك',
-        staffId,
-        staffName: staff?.name || 'موظف',
-        calledAt: new Date().toISOString()
-      };
-
-      setTickets(prev => {
-        const updated = prev.map(t => t.id === updatedTicket.id ? updatedTicket : t);
-        savePersistedClientState({ tickets: updated });
-        return updated;
-      });
-
-      setLastCalledTicket({
-        ticket: updatedTicket,
-        counter: counter?.name || 'شباك',
-        timestamp: new Date().toISOString()
-      });
-
-      return { success: true, ticket: updatedTicket };
-    }
+    return await apiFetch('/api/staff/call-next', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId, counterId })
+    });
   };
 
   const handleRecall = async (ticketId: string, staffId: string) => {
-    try {
-      return await apiFetch('/api/staff/recall', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId, staffId })
-      });
-    } catch {
-      const ticket = tickets.find(t => t.id === ticketId);
-      const counter = counters.find(c => c.id === ticket?.counterId);
-      if (ticket) {
-        setLastCalledTicket({
-          ticket,
-          counter: counter?.name || ticket.counterName || 'شباك',
-          isRecall: true,
-          timestamp: new Date().toISOString()
-        });
-      }
-      return { success: true };
-    }
+    return await apiFetch('/api/staff/recall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, staffId })
+    });
   };
 
   const handleComplete = async (ticketId: string, staffId: string) => {
-    try {
-      return await apiFetch('/api/staff/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId, staffId })
-      });
-    } catch {
-      setTickets(prev => {
-        const updated = prev.map(t => t.id === ticketId ? { ...t, status: 'completed' as const, completedAt: new Date().toISOString() } : t);
-        savePersistedClientState({ tickets: updated });
-        return updated;
-      });
-      return { success: true };
-    }
+    return await apiFetch('/api/staff/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, staffId })
+    });
   };
 
   const handleSkip = async (ticketId: string, notes: string) => {
-    try {
-      return await apiFetch('/api/staff/skip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId, notes })
-      });
-    } catch {
-      setTickets(prev => {
-        const updated = prev.map(t => t.id === ticketId ? { ...t, status: 'skipped' as const, notes } : t);
-        savePersistedClientState({ tickets: updated });
-        return updated;
-      });
-      return { success: true };
-    }
+    return await apiFetch('/api/staff/skip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, notes })
+    });
   };
 
   const handleReturnQueue = async (ticketId: string) => {
-    try {
-      return await apiFetch('/api/staff/return-queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId })
-      });
-    } catch {
-      setTickets(prev => {
-        const updated = prev.map(t => t.id === ticketId ? { ...t, status: 'waiting' as const, counterId: undefined, counterName: undefined, staffId: undefined, staffName: undefined } : t);
-        savePersistedClientState({ tickets: updated });
-        return updated;
-      });
-      return { success: true };
-    }
+    return await apiFetch('/api/staff/return-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId })
+    });
   };
-
-  if (!auth) {
-    return <LoginHome onLoginSuccess={handleLoginSuccess} staffList={staffList} counters={counters} />;
-  }
 
   const waitingCount = tickets.filter(t => t.status === 'waiting').length;
 
@@ -578,9 +391,6 @@ export default function App() {
           waitingCount={waitingCount}
           departmentTitle={settings.departmentTitle}
           onReconnect={fetchState}
-          authName={auth?.name}
-          authRole={auth?.role}
-          onLogout={handleLogout}
         />
       )}
 
@@ -652,17 +462,7 @@ export default function App() {
             serverAppUrl={serverAppUrl}
             onRefreshState={fetchState}
             onNavigate={handleNavigate}
-            onLogout={handleLogout}
           />
-        )}
-
-        {currentTab === 'hq' && (
-          <div className="p-4 sm:p-6 lg:p-8 bg-slate-950 min-h-screen">
-            <CentralHQDashboard 
-              adminToken={sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token') || undefined}
-              onRefreshState={fetchState} 
-            />
-          </div>
         )}
       </main>
     </div>

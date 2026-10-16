@@ -28,19 +28,6 @@ import {
 } from 'lucide-react';
 import { Ticket, Counter, SystemSettings } from '../types';
 
-// دالة لتنظيف اسم ورقم الشباك وحذف اسم الخدمة الملحقة مثل (توثيق وكالة) أو أي أقواس نهائياً
-export const cleanCounterNameOnly = (name: string): string => {
-  if (!name) return 'الشباك';
-  return name
-    // إزالة جميع الأقواس وما بداخلها مثل (توثيق وكالة) أو （توثيق وكالة） أو [توثيق وكالة]
-    .replace(/[\(（\[][^\)）\]]*[\)）\]]/g, '')
-    // إزالة أسماء الفئات والخدمات الصريحة إذا وجدت بدون أقواس
-    .replace(/(توثيق وكالة|الحصول على صورة عن وكالة|عزل وكالة|وكالات عامة|وكالات خاصة|تصديق العقود|الاستعلامات والدعم|تنظيم وكالة خاصة)/g, '')
-    // إزالة أي فواصل أو شرطات زائدة
-    .replace(/[-–—:]\s*.*$/, '')
-    .trim();
-};
-
 interface MainDisplayProps {
   tickets: Ticket[];
   counters: Counter[];
@@ -261,7 +248,7 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
       }
       list.push({
         id: `counter-${counter.id}`,
-        counterName: cleanCounterNameOnly(counter.name),
+        counterName: counter.name,
         counterId: counter.id,
         ticket: match,
         isOpen: counter.isOpen,
@@ -274,7 +261,7 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
       if (!assignedTicketIds.has(ticket.id)) {
         list.unshift({
           id: `orphan-${ticket.id}`,
-          counterName: cleanCounterNameOnly(ticket.counterName || 'الشباك العام'),
+          counterName: ticket.counterName || 'الشباك العام',
           counterId: ticket.counterId,
           ticket: ticket,
           isOpen: true,
@@ -407,9 +394,9 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
                   )}
 
                   {/* Header of the Card: Counter Name & Status Badge */}
-                  <div className="flex items-center justify-between border-b border-slate-800/90 pb-3.5 gap-2 flex-wrap sm:flex-nowrap">
-                    <div className="flex items-center gap-3 bg-slate-950/85 px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border border-slate-700/80 shadow-lg">
-                      <span className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full shrink-0 ${
+                  <div className="flex items-center justify-between border-b border-slate-800/90 pb-3 gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${
                         isRecallActive 
                           ? 'bg-rose-500 animate-ping'
                           : currentServing 
@@ -418,45 +405,45 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
                               ? 'bg-emerald-500' 
                               : 'bg-slate-600'
                       }`} />
-                      <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-amber-300 tracking-tight drop-shadow-md">
-                        {cleanCounterNameOnly(card.counterName)}
+                      <span className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                        {card.counterName.replace(/\s*\(.*\)$/, '').trim()}
                       </span>
                     </div>
 
                     {isRecallActive ? (
-                      <span className="text-xs sm:text-sm px-3.5 py-1.5 rounded-xl font-black bg-rose-600 text-white shadow-lg animate-bounce flex items-center gap-1.5 border border-rose-400 shrink-0">
-                        <Megaphone className="w-4 h-4" />
+                      <span className="text-xs px-3 py-1 rounded-full font-black bg-rose-600 text-white shadow-lg animate-bounce flex items-center gap-1.5 border border-rose-400">
+                        <Megaphone className="w-3.5 h-3.5" />
                         إعادة نداء عاجل
                       </span>
                     ) : isNormalHighlighted ? (
-                      <span className="text-xs sm:text-sm px-3.5 py-1.5 rounded-xl font-black bg-amber-500 text-slate-950 shadow-md animate-pulse flex items-center gap-1.5 shrink-0">
-                        <BellRing className="w-4 h-4" />
+                      <span className="text-xs px-3 py-1 rounded-full font-black bg-amber-500 text-slate-950 shadow-md animate-pulse flex items-center gap-1">
+                        <BellRing className="w-3.5 h-3.5" />
                         النداء الحالي
                       </span>
                     ) : currentServing ? (
-                      <span className="text-xs sm:text-sm px-3 py-1.5 rounded-xl font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shrink-0">
-                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                         أتى الدور
                       </span>
                     ) : card.isOpen ? (
-                      <span className="text-xs sm:text-sm px-3 py-1.5 rounded-xl font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                      <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                         متاح للنداء
                       </span>
                     ) : (
-                      <span className="text-xs px-3 py-1.5 rounded-xl font-medium bg-slate-800 text-slate-500 shrink-0">
+                      <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-slate-800 text-slate-500">
                         مغلق
                       </span>
                     )}
                   </div>
 
-                  {/* Giant Central Ticket Number */}
+                        {/* Giant Central Ticket Number */}
                   <div className="py-6 sm:py-8 text-center flex-1 flex flex-col justify-center">
                     {currentServing ? (
                       <div className="space-y-3">
-                        <div className="text-xs sm:text-sm font-bold text-amber-300/80 tracking-wider">
+                        <div className="text-[11px] font-bold text-amber-300 tracking-wider uppercase">
                           رقم الدور المطلوب
                         </div>
-                        <div className={`text-6xl sm:text-7xl lg:text-8xl xl:text-9xl font-black font-mono tracking-wider ${
+                        <div className={`text-6xl sm:text-7xl lg:text-8xl font-black font-mono tracking-wider ${
                           isRecallActive 
                             ? 'text-rose-400 drop-shadow-[0_0_35px_rgba(244,63,94,0.95)] animate-pulse' 
                             : isNormalHighlighted
@@ -649,8 +636,8 @@ export const MainDisplay: React.FC<MainDisplayProps> = ({
                 <ArrowDown className="w-5 h-5 text-amber-400 animate-bounce" />
               </div>
 
-              <div className="text-4xl sm:text-6xl md:text-7xl font-black text-white tracking-tight drop-shadow-lg py-1.5">
-                <span className="text-amber-400">{cleanCounterNameOnly(activeRecall.counter)}</span>
+              <div className="text-3xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md py-1">
+                <span className="text-amber-400">{activeRecall.counter}</span>
               </div>
 
               {activeRecall.ticket.staffName && (
