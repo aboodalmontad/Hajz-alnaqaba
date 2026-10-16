@@ -26,7 +26,7 @@ import { clearAppCache } from '../utils/cache';
 
 interface NavbarProps {
   currentTab: string;
-  setCurrentTab: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
+  setCurrentTab: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin' | 'hq') => void;
   connected: boolean;
   localIPs: string[];
   port: number;
@@ -34,6 +34,9 @@ interface NavbarProps {
   waitingCount: number;
   departmentTitle?: string;
   onReconnect?: () => void;
+  authName?: string;
+  authRole?: string;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,7 +48,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   serverAppUrl,
   waitingCount,
   departmentTitle,
-  onReconnect
+  onReconnect,
+  authName,
+  authRole,
+  onLogout
 }) => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showServerStatusModal, setShowServerStatusModal] = useState(false);
@@ -121,7 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 flex-wrap">
                   {departmentTitle || 'نقابة المحامين بحلب'}
                   <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">دائرة الوكالات</span>
-                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 6</span>
+                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 7</span>
                 </div>
                 <div className="text-xs text-slate-400">نظام إدارة الدور والانتظار (محلي لحظي عبر Wi-Fi)</div>
               </div>
@@ -129,48 +135,50 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Navigation Links */}
             <nav className="hidden xl:flex items-center gap-1 text-sm font-medium">
-              {/* Removed Wifi/Grid button */}
-              
-              <button
-                onClick={() => setCurrentTab('kiosk')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'kiosk' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Ticket className="w-4 h-4" />
-                جهاز إصدار التذاكر
-              </button>
+              {authRole !== 'hq_admin' && authRole !== 'branch_manager' && currentTab !== 'admin' && currentTab !== 'hq' && (
+                <>
+                  <button
+                    onClick={() => setCurrentTab('kiosk')}
+                    className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                      currentTab === 'kiosk' 
+                        ? 'bg-amber-600 text-white shadow-sm' 
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Ticket className="w-4 h-4" />
+                    جهاز إصدار التذاكر
+                  </button>
 
-              <button
-                onClick={() => setCurrentTab('display')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 relative ${
-                  currentTab === 'display' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Tv className="w-4 h-4" />
-                شاشة العرض الرئيسية
-                {waitingCount > 0 && (
-                  <span className="absolute -top-1 -left-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full animate-pulse">
-                    {waitingCount}
-                  </span>
-                )}
-              </button>
+                  <button
+                    onClick={() => setCurrentTab('display')}
+                    className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 relative ${
+                      currentTab === 'display' 
+                        ? 'bg-amber-600 text-white shadow-sm' 
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Tv className="w-4 h-4" />
+                    شاشة العرض الرئيسية
+                    {waitingCount > 0 && (
+                      <span className="absolute -top-1 -left-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full animate-pulse">
+                        {waitingCount}
+                      </span>
+                    )}
+                  </button>
 
-              <button
-                onClick={() => setCurrentTab('staff')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'staff' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Smartphone className="w-4 h-4 text-amber-400" />
-                بوابة المندوب (الهاتف)
-              </button>
+                  <button
+                    onClick={() => setCurrentTab('staff')}
+                    className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                      currentTab === 'staff' 
+                        ? 'bg-amber-600 text-white shadow-sm' 
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Smartphone className="w-4 h-4 text-amber-400" />
+                    بوابة المندوب (الهاتف)
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={() => setCurrentTab('admin')}
@@ -183,19 +191,49 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ShieldAlert className="w-4 h-4" />
                 صلاحيات المدير الكاملة
               </button>
+
+              {(authRole === 'hq_admin' || authRole === 'admin' || currentTab === 'hq') && (
+                <button
+                  onClick={() => setCurrentTab('hq')}
+                  className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                    currentTab === 'hq' 
+                      ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-400' 
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4 text-emerald-400" />
+                  الرقابة المركزية (المقر)
+                </button>
+              )}
             </nav>
 
             {/* Connection & Agent QR Quick Button */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowQrModal(true)}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-md border border-amber-400/40 transition-all active:scale-95"
-                title="عرض رمز QR لمندوبي الوكالات من الهاتف"
-              >
-                <QrCode className="w-4 h-4" />
-                <span className="hidden md:inline">رمز الهاتف للمندوب</span>
-                <span className="md:hidden">كود الهاتف</span>
-              </button>
+              {authName && (
+                <div className="hidden lg:flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs text-slate-200">
+                  <span className="font-bold text-amber-300">👤 {authName}</span>
+                  {onLogout && (
+                    <button
+                      onClick={onLogout}
+                      className="px-2 py-0.5 bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/40 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                    >
+                      خروج
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {currentTab !== 'admin' && authRole !== 'branch_manager' && (
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-md border border-amber-400/40 transition-all active:scale-95"
+                  title="عرض رمز QR لمندوبي الوكالات من الهاتف"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span className="hidden md:inline">رمز الهاتف للمندوب</span>
+                  <span className="md:hidden">كود الهاتف</span>
+                </button>
+              )}
 
               <button
                 onClick={() => handleClearCache(false)}
@@ -272,6 +310,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ShieldAlert className="w-4 h-4" />
               <span>لوحة المدير</span>
             </button>
+            {(authRole === 'hq_admin' || authRole === 'admin' || currentTab === 'hq') && (
+              <button
+                onClick={() => setCurrentTab('hq')}
+                className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                  currentTab === 'hq' 
+                    ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                    : 'bg-slate-800 text-slate-300 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-4 h-4 text-emerald-400" />
+                <span>الرقابة المركزية</span>
+              </button>
+            )}
           </div>
 
         </div>
