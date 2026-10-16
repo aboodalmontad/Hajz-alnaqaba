@@ -2556,6 +2556,7 @@ app.post('/api/sync/pull-hq', async (req, res) => {
     const result = await syncService.pullAllBranchesDataToHQ();
     res.json(result);
   } catch (err: any) {
+    console.error('SERVER_ERROR [/api/sync/pull-hq]:', err);
     res.status(500).json({ success: false, message: err.message || 'خطأ في جلب بيانات الفروع.' });
   }
 });
