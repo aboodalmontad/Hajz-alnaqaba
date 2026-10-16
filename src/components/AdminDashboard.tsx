@@ -45,10 +45,14 @@ import {
   Tag,
   Sparkles,
   Ticket,
-  Save
+  Save,
+  CloudUpload,
+  Cloud,
+  Send,
+  CheckCircle2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
+import type { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig, SyncSettings, SyncHistoryLog } from '../types';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
 import { Kiosk } from './Kiosk';
 
@@ -65,7 +69,8 @@ interface AdminDashboardProps {
   port?: number;
   serverAppUrl?: string;
   onRefreshState: () => void;
-  onNavigate?: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
+  onNavigate?: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin' | 'hq') => void;
+  onLogout?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -81,19 +86,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   port = 3000,
   serverAppUrl,
   onRefreshState,
-  onNavigate
+  onNavigate,
+  onLogout
 }) => {
+  const authData = (() => {
+    try {
+      const raw = sessionStorage.getItem('agency_auth');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  })();
+  const isBranchManager = authData?.role === 'branch_manager';
+
   // Auth state
   const [adminToken, setAdminToken] = useState<string | null>(() => {
-    return sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token') || null;
+    const direct = sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
+    if (direct) return direct;
+    try {
+      const authRaw = sessionStorage.getItem('agency_auth');
+      if (authRaw) {
+        const parsed = JSON.parse(authRaw);
+        if (parsed?.token) return parsed.token;
+      }
+    } catch {}
+    return null;
   });
   const [adminPinInput, setAdminPinInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs' | 'branch_sync'>('overview');
   const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts' | 'categories' | 'database'>('counters');
+
+  // Branch Sync state for Branch Manager
+  const [branchSyncSettings, setBranchSyncSettings] = useState<SyncSettings | null>(null);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [branchSyncHistory, setBranchSyncHistory] = useState<SyncHistoryLog[]>([]);
+  const [isPushingSync, setIsPushingSync] = useState<boolean>(false);
+  const [branchSyncMessage, setBranchSyncMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [isTestingSupabase, setIsTestingSupabase] = useState<boolean>(false);
+  const [testSupabaseResult, setTestSupabaseResult] = useState<{ success?: boolean; message?: string } | null>(null);
 
   const getNextServicePrefix = (categories: CategoryConfig[] = []) => {
     const existingPrefixes = categories.map(c => c.prefix?.toUpperCase() || '');
@@ -235,11 +268,102 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (adminToken) {
-      fetchAdminStaffList();
+  // Fetch Branch Sync Settings & Queue status
+  const fetchBranchSyncData = async () => {
+    try {
+      const data = await apiFetch('/api/sync/settings');
+      if (data && data.settings) {
+        setBranchSyncSettings(data.settings);
+        setPendingSyncCount(data.pendingCount || 0);
+        if (Array.isArray(data.history)) {
+          setBranchSyncHistory(data.history);
+        }
+      }
+    } catch (e) {
+      // Sync endpoint may not be available or network error
     }
+  };
+
+  useEffect(() => {
+    fetchBranchSyncData();
   }, [adminToken]);
+
+  // Branch Manager triggers data push to Supabase cloud
+  const handleTriggerBranchPush = async () => {
+    setIsPushingSync(true);
+    setBranchSyncMessage(null);
+    try {
+      const res = await adminFetch('/api/sync/push', { method: 'POST' });
+      if (res && res.success) {
+        setBranchSyncMessage({
+          type: 'success',
+          text: res.message || 'تم رفع ومزامنة بيانات الفرع إلى السحابة بنجاح!'
+        });
+        showToast('success', 'تم رفع بيانات الفرع بنجاح إلى السحابة.');
+      } else {
+        setBranchSyncMessage({
+          type: 'error',
+          text: res.message || 'فشلت المزامنة، تم الإبقاء على البيانات محلياً في قائمة الانتظار.'
+        });
+        showToast('error', res.message || 'تعذر إتمام المزامنة السحابية.');
+      }
+      fetchBranchSyncData();
+      onRefreshState();
+    } catch (err: any) {
+      setBranchSyncMessage({
+        type: 'error',
+        text: `تعذر الاتصال بالسحابة: ${err.message || 'انقطاع الإنترنت'}. لا تقلق، جميع البيانات محفوظة محلياً.`
+      });
+      showToast('error', 'انقطاع بالاتصال بالسحابة. البيانات آمنة ومحفوظة محلياً.');
+    } finally {
+      setIsPushingSync(false);
+    }
+  };
+
+  // Branch Manager tests Supabase Connection
+  const handleTestBranchSupabase = async () => {
+    setIsTestingSupabase(true);
+    setTestSupabaseResult(null);
+    try {
+      const res = await apiFetch('/api/sync/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supabaseUrl: branchSyncSettings?.supabaseUrl,
+          supabaseKey: branchSyncSettings?.supabaseKey
+        })
+      });
+      setTestSupabaseResult({
+        success: res.success,
+        message: res.message
+      });
+    } catch (err: any) {
+      setTestSupabaseResult({
+        success: false,
+        message: err.message || 'فشل الاتصال بـ Supabase.'
+      });
+    } finally {
+      setIsTestingSupabase(false);
+    }
+  };
+
+  // Save Branch Sync Settings (Branch ID, Branch Name, Interval, Supabase Credentials)
+  const handleSaveBranchSyncSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!branchSyncSettings) return;
+    try {
+      const res = await adminFetch('/api/sync/settings', {
+        method: 'POST',
+        body: JSON.stringify(branchSyncSettings)
+      });
+      if (res && res.success) {
+        showToast('success', 'تم حفظ إعدادات المزامنة السحابية للفرع بنجاح.');
+        fetchBranchSyncData();
+      }
+    } catch (err: any) {
+      showToast('error', err.message || 'خطأ في حفظ الإعدادات.');
+    }
+  };
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text });
@@ -1079,13 +1203,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">صلاحيات المدير العام الكاملة</h1>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">
+                {isBranchManager ? (authData?.name || 'لوحة تحكم مدير المكتب الفرعي') : 'صلاحيات المدير العام الكاملة'}
+              </h1>
               <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-0.5 rounded-md border border-amber-500/40 font-semibold">
-                إدارة مركزية شاملة
+                {isBranchManager ? 'إدارة الفرع' : 'إدارة مركزية شاملة'}
               </span>
             </div>
             <div className="text-xs text-slate-300 mt-1 flex items-center gap-3">
               <span>تاريخ التشغيل: <strong className="text-amber-400 font-mono">{date}</strong></span>
+              {isBranchManager && authData?.branchId && (
+                <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                  فرع معتمد
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1093,14 +1224,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={handleNewDay}
-            className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
+            className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" /> بدء يوم عمل جديد
           </button>
 
           <button
+            onClick={() => {
+              if (onLogout) {
+                onLogout();
+              } else {
+                sessionStorage.removeItem('agency_auth');
+                sessionStorage.removeItem('agency_admin_token');
+                localStorage.removeItem('agency_admin_token');
+                window.location.href = '/';
+              }
+            }}
+            className="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+            title="تسجيل الخروج والعودة للصفحة الرئيسية للتطبيق"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>تسجيل الخروج إلى الرئيسية</span>
+          </button>
+
+          <button
             onClick={handleAdminLogout}
-            className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-all text-xs flex items-center gap-1.5"
+            className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-all text-xs flex items-center gap-1.5 cursor-pointer"
             title="تسجيل الخروج من الإدارة"
           >
             <LogOut className="w-4 h-4" /> خروج
@@ -1108,53 +1257,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* PROMINENT AGENT QR & LINK CARD FOR ADMIN */}
-      <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-white border-2 border-amber-500/30 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-5">
-        <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-right w-full md:w-auto">
-          <div className="p-2.5 bg-white rounded-2xl shadow-md border border-amber-200 shrink-0">
-            <QRCodeSVG value={agentUrl} size={110} level="H" includeMargin={true} />
-          </div>
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 bg-amber-600 text-white px-2.5 py-0.5 rounded-full text-[11px] font-bold">
-              <Smartphone className="w-3.5 h-3.5" /> رمز QR لدخول المندوبين من الهاتف (/agent)
-            </div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900">
-              امسح الرمز أو شارك الرابط المباشر مع مندوبي الوكالات
-            </h3>
-            <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
-              يفتح المندوب الرابط من متصفح هاتفه المتصل بالشبكة، ليسجل الدخول ويحجز شباكه المتاح ويبدأ استقبال المراجعين فوراً.
-            </p>
-            <div className="bg-slate-900 text-amber-300 font-mono text-xs px-3 py-1 rounded-xl break-all select-all inline-block mt-1">
-              {agentUrl}
-            </div>
-          </div>
-        </div>
 
-        <div className="flex flex-row gap-2 shrink-0 w-full md:w-auto justify-end">
-          <button
-            onClick={async () => {
-              const ok = await copyToClipboard(agentUrl);
-              if (ok) {
-                setCopiedAgentUrl(true);
-                setTimeout(() => setCopiedAgentUrl(false), 2500);
-              }
-            }}
-            className="flex-1 md:flex-none px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95"
-          >
-            {copiedAgentUrl ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {copiedAgentUrl ? 'تم نسخ الرابط!' : 'نسخ الرابط'}
-          </button>
-          <a
-            href={agentUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 md:flex-none px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-300 transition-all text-center shadow-sm"
-          >
-            <ExternalLink className="w-4 h-4" />
-            تجربة
-          </a>
-        </div>
-      </div>
 
       {/* Main Navigation Tabs */}
       <div className="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 flex gap-2 overflow-x-auto">
@@ -1192,6 +1295,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <Settings className="w-4 h-4" />
           إعدادات الشاشة والتطبيق والرمز
+        </button>
+
+        <button
+          onClick={() => setActiveTab('branch_sync')}
+          className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'branch_sync' 
+              ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md ring-2 ring-amber-400/40' 
+              : 'text-amber-900 bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/60'
+          }`}
+        >
+          <CloudUpload className="w-4 h-4 text-amber-500" />
+          <span>رفع ومزامنة بيانات الفرع (السحابة)</span>
+          {pendingSyncCount > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+              {pendingSyncCount} بانتظار الرفع
+            </span>
+          )}
         </button>
 
         <button
@@ -2296,8 +2416,285 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* ======================================================== */}
-      {/* MODAL: EDIT TICKET                                       */}
+      {/* SECTION 5: رفع ومزامنة بيانات الفرع (BRANCH CLOUD SYNC) */}
       {/* ======================================================== */}
+      {activeTab === 'branch_sync' && (
+        <div className="space-y-6">
+          {/* Main Action Banner: Upload Now */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-500/40 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold">
+                <CloudUpload className="w-4 h-4 text-amber-400" />
+                <span>إدارة المزامنة المباشرة لفرع: {branchSyncSettings?.branchName || 'فرع نقابة المحامين'}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                رفع بيانات الفرع إلى السحابة المركزية (Supabase)
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                يقوم مدير الفرع بالضغط على هذا الزر لرفع جميع تذاكر اليوم، وحركات المندوبين، والوكالات المنجزة، وسجلات التدقيق إلى السحابة المركزية. 
+                في حال عدم توفر الإنترنت، تظل جميع البيانات محفوظة ومؤمنة في قاعدة البيانات المحلية.
+              </p>
+
+              {/* Status Pills */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <div className="bg-slate-800/90 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-2">
+                  <span className="text-slate-400">معرف الفرع:</span>
+                  <span className="font-mono text-amber-400 font-bold">{branchSyncSettings?.branchCode || 'ALP-MAIN'}</span>
+                </div>
+                <div className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-2 ${
+                  pendingSyncCount > 0 
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                    : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${pendingSyncCount > 0 ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`} />
+                  <span>عناصر بانتظار الرفع: <strong>{pendingSyncCount}</strong></span>
+                </div>
+                <div className="bg-slate-800/90 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-2">
+                  <span className="text-slate-400">آخر حالة مزامنة:</span>
+                  <span className="font-semibold text-slate-200">
+                    {branchSyncSettings?.lastSyncStatus === 'success' ? 'ناجحة ✓' : 
+                     branchSyncSettings?.lastSyncStatus === 'failed' ? 'تعذر الاتصال ✗' : 'جاهز للرفع'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Trigger Button */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-auto shrink-0">
+              <button
+                type="button"
+                onClick={handleTriggerBranchPush}
+                disabled={isPushingSync}
+                className="px-6 py-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-black rounded-2xl shadow-xl shadow-amber-950/40 border border-amber-300 flex items-center justify-center gap-3 transition-all active:scale-95 text-sm sm:text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CloudUpload className={`w-5 h-5 ${isPushingSync ? 'animate-bounce' : ''}`} />
+                <span>{isPushingSync ? 'جارِ رفع البيانات للسحابة...' : 'رفع ومزامنة بيانات الفرع الآن'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={fetchBranchSyncData}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>تحديث حالة قائمة الانتظار</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback message banner if triggered */}
+          {branchSyncMessage && (
+            <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold flex items-center justify-between gap-3 ${
+              branchSyncMessage.type === 'success'
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                : 'bg-red-50 text-red-900 border-red-300'
+            }`}>
+              <div className="flex items-center gap-3">
+                {branchSyncMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                )}
+                <span>{branchSyncMessage.text}</span>
+              </div>
+              <button onClick={() => setBranchSyncMessage(null)} className="p-1 hover:bg-black/10 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Grid: Settings Configuration & Recent Sync History */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Box: Branch Identification & Cloud Settings */}
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-amber-600" />
+                    بيانات هوية الفرع وإعدادات Supabase
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    تحديد اسم الفرع وكوده ومفاتيح الاتصال بمشروع Supabase المركزي
+                  </p>
+                </div>
+              </div>
+
+              {branchSyncSettings && (
+                <form onSubmit={handleSaveBranchSyncSettings} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">اسم هذا الفرع:</label>
+                    <input
+                      type="text"
+                      value={branchSyncSettings.branchName || ''}
+                      onChange={e => setBranchSyncSettings({ ...branchSyncSettings, branchName: e.target.value })}
+                      placeholder="مثال: فرع القصر العدلي - حلب"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">كود الفرع (رمز التذاكر):</label>
+                      <input
+                        type="text"
+                        value={branchSyncSettings.branchCode || ''}
+                        onChange={e => setBranchSyncSettings({ ...branchSyncSettings, branchCode: e.target.value.toUpperCase() })}
+                        placeholder="مثال: ALP-01"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono font-bold uppercase focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">معرف الفرع الفريد (ID):</label>
+                      <input
+                        type="text"
+                        value={branchSyncSettings.branchId || ''}
+                        onChange={e => setBranchSyncSettings({ ...branchSyncSettings, branchId: e.target.value })}
+                        placeholder="branch-aleppo-01"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">رابط مشروع Supabase المركزي (URL):</label>
+                    <input
+                      type="url"
+                      value={branchSyncSettings.supabaseUrl || ''}
+                      onChange={e => setBranchSyncSettings({ ...branchSyncSettings, supabaseUrl: e.target.value })}
+                      placeholder="https://xyzproject.supabase.co"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono focus:ring-2 focus:ring-amber-500"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      يمكن أيضاً تعيينه في متغير البيئة VITE_SUPABASE_URL أو مفاتيح البيئة لحماية إضافية.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">مفتاح الوصول السحابي (Supabase Anon Key):</label>
+                    <input
+                      type="password"
+                      value={branchSyncSettings.supabaseKey || ''}
+                      onChange={e => setBranchSyncSettings({ ...branchSyncSettings, supabaseKey: e.target.value })}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-mono focus:ring-2 focus:ring-amber-500"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      أدخل المفتاح أو اتركه ليعتمد على المفتاح السري المشفر في الخادم.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">المزامنة التلقائية الدورية في الخلفية</div>
+                      <div className="text-[11px] text-slate-500">رفع البيانات دورياً عندما يتوفر اتصال الإنترنت</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={!!branchSyncSettings.autoSyncEnabled}
+                      onChange={e => setBranchSyncSettings({ ...branchSyncSettings, autoSyncEnabled: e.target.checked })}
+                      className="w-5 h-5 accent-amber-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {testSupabaseResult && (
+                    <div className={`p-3 rounded-xl border text-xs font-bold ${
+                      testSupabaseResult.success 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                        : 'bg-red-50 text-red-800 border-red-200'
+                    }`}>
+                      {testSupabaseResult.message}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shadow-md transition-all active:scale-95"
+                    >
+                      حفظ إعدادات الفرع
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestBranchSupabase}
+                      disabled={isTestingSupabase}
+                      className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 transition-all flex items-center gap-1.5"
+                    >
+                      {isTestingSupabase ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Cloud className="w-3.5 h-3.5" />}
+                      <span>اختبار الاتصال</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Right Box: Recent Branch Sync Logs */}
+            <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-amber-600" />
+                      سجل عمليات الرفع الأخيرة للفرع
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      بيان تفصيلي بآخر عمليات الرفع السحابية التي قام بها مدير الفرع
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  {branchSyncHistory.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      لا توجد عمليات رفع مسجلة مؤخراً. اضغط على زر "رفع ومزامنة بيانات الفرع الآن" للبدء.
+                    </div>
+                  ) : (
+                    branchSyncHistory.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 text-xs transition-colors space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[11px] text-slate-500">
+                            {new Date(item.timestamp).toLocaleTimeString('ar-SY')} · {new Date(item.timestamp).toLocaleDateString('ar-SY')}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            item.status === 'success' 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : 'bg-red-100 text-red-800 border border-red-200'
+                          }`}>
+                            {item.status === 'success' ? 'نجحت المزامنة' : 'فشلت'}
+                          </span>
+                        </div>
+                        <div className="text-slate-800 font-semibold">{(item as any).message || item.details}</div>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-0.5">
+                          <span>السجلات المرفوعة: <strong className="text-slate-800">{(item as any).itemsCount ?? item.recordsPushed}</strong></span>
+                          <span>الجهة: <strong className="text-slate-800">{item.branchName || branchSyncSettings?.branchName}</strong></span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Offline Assurance Card */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-950 flex items-start gap-3 mt-4">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-black block">ضمان استمرارية العمل دون إنترنت:</span>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed">
+                    يعمل الفرع بجميع وظائفه (إصدار تذاكر، نداء الشبابيك، تسجيل الوكالات) بشكل محلي مستقل تاماً. عند انقطاع الإنترنت، يتم تجميع كل الحركات تلقائياً في قائمة انتظار ليرفعها مدير الفرع فور عودة الشبكة.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingTicket && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">

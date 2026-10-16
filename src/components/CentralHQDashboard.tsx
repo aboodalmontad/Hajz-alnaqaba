@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { Branch, AgencyTransaction, SyncHistoryLog, SyncSettings, Ticket, AuditLog, BranchManagerUser } from '../types';
 import { apiFetch } from '../utils/network';
+import { BranchDetailsView } from './BranchDetailsView';
 
 interface CentralHQDashboardProps {
   currentBranchId?: string;
@@ -41,6 +42,9 @@ interface CentralHQDashboardProps {
 
 export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState }: CentralHQDashboardProps) {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'agencies' | 'managers' | 'sync_status' | 'settings'>('overview');
+  
+  // Independent Branch Details & Performance Management Page View state
+  const [selectedBranchForDetails, setSelectedBranchForDetails] = useState<string | null>(null);
   
   // Branch Managers state
   const [branchManagers, setBranchManagers] = useState<BranchManagerUser[]>([]);
@@ -399,6 +403,21 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
     return matchesBranch && matchesSearch;
   });
 
+  // If a branch is selected for comprehensive management, render the independent BranchDetailsView page
+  if (selectedBranchForDetails) {
+    return (
+      <BranchDetailsView
+        branchId={selectedBranchForDetails}
+        adminToken={adminToken}
+        onBackToBranches={() => setSelectedBranchForDetails(null)}
+        onBranchUpdated={() => {
+          loadHQData(false);
+          if (onRefreshState) onRefreshState();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-100" dir="rtl">
       {/* Top Banner / Mode Header */}
@@ -589,14 +608,23 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                 <span className="text-xs text-slate-400">({branches.length} مكاتب متصلة)</span>
               </h2>
 
-              <button
-                onClick={() => loadHQData(true)}
-                disabled={loading}
-                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                <span>تحديث البيانات من السحابة</span>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.open('/api/backup/download', '_blank')}
+                  className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تنزيل نسخة كاملة (جميع الفروع)</span>
+                </button>
+                <button
+                  onClick={() => loadHQData(true)}
+                  disabled={loading}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <span>تحديث البيانات من السحابة</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -608,8 +636,8 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                 return (
                   <div
                     key={branch.id}
-                    onClick={() => setSelectedBranchModal(branch)}
-                    className={`bg-slate-900 border rounded-2xl p-4 transition-all shadow-md relative overflow-hidden cursor-pointer hover:border-amber-500/80 hover:shadow-amber-500/10 ${
+                    onClick={() => setSelectedBranchForDetails(branch.id)}
+                    className={`bg-slate-900 border rounded-2xl p-4 transition-all shadow-md relative overflow-hidden cursor-pointer hover:border-amber-500/80 hover:shadow-amber-500/10 group ${
                       isSelected
                         ? 'border-amber-500 ring-2 ring-amber-500/20'
                         : 'border-slate-800'
@@ -618,7 +646,7 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-white text-sm">{branch.name}</h3>
+                          <h3 className="font-bold text-white text-sm group-hover:text-amber-400 transition-colors">{branch.name}</h3>
                           {branch.isHeadquarters && (
                             <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-500/30">
                               المقر
@@ -658,7 +686,7 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                       </div>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800/80 pt-2.5 mt-2">
+                    <div className="text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800/80 pt-2.5 mt-2 flex-wrap gap-2">
                       <div className="flex items-center gap-1 text-slate-400">
                         <Clock className="w-3 h-3 text-slate-500" />
                         <span>آخر مزامنة:</span>
@@ -667,13 +695,21 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => setSelectedBranchForDetails(branch.id)}
+                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                          title="فتح صفحة تفاصيل الفرع وإدارة الأداء"
+                        >
+                          <span>تفاصيل الفرع وإدارة الأداء</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
                         <button
                           onClick={() => setSelectedBranchModal(branch)}
-                          className="px-2.5 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-[11px] font-medium cursor-pointer transition-all"
+                          title="معاينة سريعة"
                         >
-                          <span>عرض كافة البيانات</span>
-                          <ExternalLink className="w-3 h-3" />
+                          <span>معاينة</span>
                         </button>
                       </div>
                     </div>
@@ -951,9 +987,17 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                   ) : (
                     branchManagers.map((mgr) => (
                       <tr key={mgr.id} className="hover:bg-slate-800/30">
-                        <td className="p-3.5 font-bold text-white flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-amber-500 shrink-0" />
-                          <span>{mgr.branchName}</span>
+                        <td className="p-3.5 font-bold text-white">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBranchForDetails(mgr.branchId)}
+                            className="flex items-center gap-2 text-white hover:text-amber-400 transition-colors text-right cursor-pointer group"
+                            title="فتح صفحة تفاصيل وإدارة هذا الفرع"
+                          >
+                            <Building2 className="w-4 h-4 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
+                            <span className="group-hover:underline">{mgr.branchName}</span>
+                            <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-amber-400" />
+                          </button>
                         </td>
                         <td className="p-3.5 font-semibold text-slate-200">{mgr.fullName}</td>
                         <td className="p-3.5 font-mono font-bold text-amber-400 bg-slate-950/40 rounded px-2">{mgr.username}</td>
@@ -1439,12 +1483,28 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedBranchModal(null)}
-                className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bId = selectedBranchModal.id;
+                    setSelectedBranchModal(null);
+                    setSelectedBranchForDetails(bId);
+                  }}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                  title="الانتقال إلى صفحة تفاصيل الفرع وإدارة الأداء"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">فتح صفحة تفاصيل الفرع وإدارة الأداء</span>
+                  <span className="sm:hidden">إدارة الفرع</span>
+                </button>
+                <button
+                  onClick={() => setSelectedBranchModal(null)}
+                  className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Navigation Tabs */}
