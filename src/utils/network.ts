@@ -85,31 +85,30 @@ export async function copyToClipboard(text: string): Promise<boolean> {
  * Safely executes a fetch request and parses JSON response, guarding against HTML error pages.
  */
 export async function apiFetch(url: string, options: RequestInit = {}) {
-  const fetchOptions = {
-    cache: 'no-store' as RequestCache,
-    ...options
-  };
-  const res = await fetch(url, fetchOptions);
-  const text = await res.text();
-
-  if (!res.ok) {
-    let errorMsg = `خطأ في الخادم (${res.status})`;
-    try {
-      const parsed = JSON.parse(text);
-      errorMsg = parsed.error || parsed.message || errorMsg;
-    } catch {}
-    const err: any = new Error(errorMsg);
-    err.status = res.status;
-    throw err;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    if (text.trim().startsWith('<')) {
-      throw new Error('الخادم قيد البدء أو يعيد توجيه الصفحة، يرجى المحاولة بعد قليل.');
+  const res = await fetch(url, options);
+  const contentType = res.headers.get('content-type') || '';
+  
+  if (contentType.includes('application/json')) {
+    const data = await res.json();
+    if (!res.ok) {
+      const err: any = new Error(data.error || data.message || `خطأ في الخادم (${res.status})`);
+      err.status = res.status;
+      err.data = data;
+      throw err;
     }
-    throw new Error('استجابة غير صالحة من الخادم (ليست بصيغة JSON)');
+    return data;
+  } else {
+    const text = await res.text();
+    if (!res.ok) {
+      const err: any = new Error(`تعذر الاتصال بالخادم (${res.status}): ${text.substring(0, 80)}`);
+      err.status = res.status;
+      throw err;
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('استجابة غير صالحة من الخادم (ليست بصيغة JSON)');
+    }
   }
 }
 
