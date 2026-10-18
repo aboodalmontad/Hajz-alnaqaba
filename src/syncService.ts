@@ -209,7 +209,7 @@ export class SyncService {
     // Limit syncQueue memory to last 500 records to prevent memory bloat
     if (this.db.syncQueue.length > 500) {
       this.db.syncQueue = this.db.syncQueue.filter(
-        (i: SyncQueueItem) => i.syncStatus !== 'synced' || Date.now() - new Date(i.createdAt).getTime() < 86400000
+        (i: SyncQueueItem) => i.syncStatus !== 'synced' || Date.now() - new Date(i.createdAt || Date.now()).getTime() < 86400000
       );
     }
 
@@ -228,7 +228,7 @@ export class SyncService {
     const branchId = this.db.syncSettings.branchId;
     const branchName = this.db.syncSettings.branchName;
     const pendingItems: SyncQueueItem[] = (this.db.syncQueue || []).filter(
-      (i: SyncQueueItem) => i.syncStatus === 'pending' || (i.syncStatus === 'failed' && i.retryCount < 5)
+      (i: SyncQueueItem) => i.syncStatus === 'pending' || (i.syncStatus === 'failed' && (i.retryCount || 0) < 5)
     );
 
     if (pendingItems.length === 0) {
@@ -396,7 +396,7 @@ export class SyncService {
     return {
       success: errors.length === 0,
       pushedCount: successCount,
-      message: historyLog.details
+      message: historyLog.details || ''
     };
   }
 
@@ -588,7 +588,7 @@ export class SyncService {
       return {
         success: true,
         data: cacheResult,
-        message: historyLog.details
+        message: historyLog.details || ''
       };
     } catch (err: any) {
       console.warn('Failed to pull branches data from cloud, loading local cache fallback:', err);

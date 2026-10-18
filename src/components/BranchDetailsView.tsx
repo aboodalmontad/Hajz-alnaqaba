@@ -1728,7 +1728,7 @@ export function BranchDetailsView({
                 <span>سجل الإدارة السابق وتاريخ التعيينات في هذا الفرع</span>
               </h3>
 
-              {managerHistory.length === 0 ? (
+              {(!managerHistory || managerHistory.length === 0) ? (
                 <div className="py-6 text-center text-xs text-slate-500 bg-slate-950 rounded-2xl border border-slate-800">
                   لا توجد سجلات استبدال سابقة لهذا الفرع، والمدير الحالي هو المعين الأول.
                 </div>
@@ -1745,7 +1745,7 @@ export function BranchDetailsView({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-850">
-                      {managerHistory.map(mh => (
+                      {(managerHistory || []).map(mh => (
                         <tr key={mh.id} className="hover:bg-slate-800/40">
                           <td className="p-3 font-bold text-white">{mh.managerName}</td>
                           <td className="p-3 font-mono text-slate-400">
