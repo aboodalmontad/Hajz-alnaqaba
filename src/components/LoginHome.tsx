@@ -385,7 +385,10 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="font-bold text-xs">الإدارة المركزية</div>
+                  <div className="font-bold text-xs flex items-center gap-1.5">
+                    <span>الإدارة المركزية</span>
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono font-bold">7-2</span>
+                  </div>
                   <div className="text-[10px] text-slate-400">التحكم الشامل والإعدادات</div>
                 </div>
               </button>

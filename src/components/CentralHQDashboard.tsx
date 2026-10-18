@@ -686,9 +686,14 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
             <div className="w-16 h-16 bg-gradient-to-br from-amber-500/20 to-amber-700/20 border border-amber-500/40 rounded-2xl mx-auto flex items-center justify-center text-amber-400 shadow-lg">
               <ShieldAlert className="w-8 h-8" />
             </div>
-            <span className="inline-block bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-0.5 rounded-full text-[11px] font-bold">
-              سيرفر سحابي مستقل (Vercel + Supabase)
-            </span>
+            <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
+              <span className="inline-block bg-amber-600 text-white px-2.5 py-0.5 rounded-md text-[11px] font-bold shadow-sm">
+                الإصدار 7-2
+              </span>
+              <span className="inline-block bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-0.5 rounded-full text-[11px] font-bold">
+                سيرفر سحابي مستقل (Vercel + Supabase)
+              </span>
+            </div>
             <h1 className="text-2xl font-black text-white">بوابة الإدارة العامة المركزية</h1>
             <p className="text-xs text-slate-400">
               تسجيل دخول المدير العام للاطلاع الشامل على كافة الفروع وتنزيل النسخ الاحتياطية
@@ -813,8 +818,11 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                 <Building2 className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5 flex-wrap">
                   لوحة الإدارة العامة المركزية
+                  <span className="text-xs bg-amber-600 text-white px-2.5 py-0.5 rounded-md font-bold shadow-sm">
+                    الإصدار 7-2
+                  </span>
                   <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold">
                     سيرفر سحابي مستقل (Vercel + Supabase)
                   </span>
@@ -2115,6 +2123,20 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
           </div>
         </div>
       )}
+
+      {/* Footer Info Bar */}
+      <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-amber-400" />
+          <span>نقابة المحامين بحلب – لوحة الإدارة العامة المركزية</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="bg-amber-600 text-white font-bold px-2 py-0.5 rounded-md text-[11px] shadow-sm">
+            الإصدار 7-2
+          </span>
+          <span className="text-slate-500">منظومة أرشفة الوكالات وتنظيم الدور</span>
+        </div>
+      </div>
     </div>
   );
 }
