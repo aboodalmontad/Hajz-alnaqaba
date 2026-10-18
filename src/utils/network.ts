@@ -81,16 +81,14 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-/**
- * Safely executes a fetch request and parses JSON response, guarding against HTML error pages and startup delays.
- */
-export async function apiFetch(url: string, options: RequestInit = {}, retries = 3, delay = 1000): Promise<any> {
+export async function apiFetch(url: string, options: RequestInit = {}, retries = 4, delay = 800): Promise<any> {
   const fetchOptions = {
     cache: 'no-store' as RequestCache,
     ...options
   };
-  const baseUrl = (typeof window !== 'undefined') ? window.location.origin : '';
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+  const fullUrl = url.startsWith('http') 
+    ? url 
+    : (typeof window !== 'undefined' && window.location?.origin ? `${window.location.origin}${url}` : url);
   
   try {
     const res = await fetch(fullUrl, fetchOptions);
@@ -105,7 +103,7 @@ export async function apiFetch(url: string, options: RequestInit = {}, retries =
 
       if ((res.status >= 500 && res.status <= 504) && retries > 0) {
         await new Promise(r => setTimeout(r, delay));
-        return apiFetch(url, options, retries - 1, delay * 2);
+        return apiFetch(url, options, retries - 1, delay * 1.5);
       }
 
       const err: any = new Error(errorMsg);
@@ -118,7 +116,7 @@ export async function apiFetch(url: string, options: RequestInit = {}, retries =
     } catch {
       if (text.trim().startsWith('<') && retries > 0) {
         await new Promise(r => setTimeout(r, delay));
-        return apiFetch(url, options, retries - 1, delay * 2);
+        return apiFetch(url, options, retries - 1, delay * 1.5);
       }
       if (text.trim().startsWith('<')) {
         throw new Error('الخادم قيد البدء أو يعيد توجيه الصفحة، يرجى المحاولة بعد قليل.');
@@ -126,11 +124,19 @@ export async function apiFetch(url: string, options: RequestInit = {}, retries =
       throw new Error('استجابة غير صالحة من الخادم (ليست بصيغة JSON)');
     }
   } catch (err: any) {
-    if (retries > 0 && (err.message?.includes('قيد البدء') || err.message?.includes('فشل') || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError'))) {
+    const isNetworkOrStartupError = 
+      err.name === 'TypeError' ||
+      err.message?.includes('Failed to fetch') ||
+      err.message?.includes('NetworkError') ||
+      err.message?.includes('قيد البدء') ||
+      err.message?.includes('فشل');
+
+    if (retries > 0 && isNetworkOrStartupError) {
       await new Promise(r => setTimeout(r, delay));
-      return apiFetch(url, options, retries - 1, delay * 2);
+      return apiFetch(url, options, retries - 1, delay * 1.5);
     }
-    console.error('Fetch error for', fullUrl, ':', err);
+
+    console.warn('Network request deferred or offline:', fullUrl, err.message || err);
     throw err;
   }
 }

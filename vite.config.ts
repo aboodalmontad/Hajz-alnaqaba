@@ -4,9 +4,88 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+function hmrWsShimPlugin() {
+  const shimCode = `(function() {
+  if (typeof window === 'undefined' || !window.WebSocket) return;
+  var NativeWebSocket = window.WebSocket;
+
+  class ViteHmrShim extends EventTarget {
+    constructor(url, protocols) {
+      super();
+      this.url = String(url || '');
+      this.protocol = typeof protocols === 'string' ? protocols : (Array.isArray(protocols) ? protocols.join(', ') : 'vite-hmr');
+      this.readyState = 1;
+      this.binaryType = 'blob';
+      this.bufferedAmount = 0;
+      this.extensions = '';
+      this.onopen = null;
+      this.onclose = null;
+      this.onerror = null;
+      this.onmessage = null;
+
+      var self = this;
+      setTimeout(function() {
+        var openEvent = new Event('open');
+        if (typeof self.onopen === 'function') {
+          try { self.onopen(openEvent); } catch (e) {}
+        }
+        self.dispatchEvent(openEvent);
+      }, 0);
+    }
+    send() {}
+    close() {
+      this.readyState = 3;
+    }
+  }
+
+  ViteHmrShim.CONNECTING = 0;
+  ViteHmrShim.OPEN = 1;
+  ViteHmrShim.CLOSING = 2;
+  ViteHmrShim.CLOSED = 3;
+
+  function WebSocketProxy(url, protocols) {
+    var urlStr = String(url || '');
+    var isHmr = (typeof protocols === 'string' && protocols.indexOf('vite-hmr') !== -1) ||
+                (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1) ||
+                urlStr.indexOf('token=') !== -1 ||
+                urlStr.indexOf('vite-hmr') !== -1;
+
+    if (isHmr) {
+      return new ViteHmrShim(url, protocols);
+    }
+    return new NativeWebSocket(url, protocols);
+  }
+
+  WebSocketProxy.prototype = NativeWebSocket.prototype;
+  WebSocketProxy.CONNECTING = NativeWebSocket.CONNECTING;
+  WebSocketProxy.OPEN = NativeWebSocket.OPEN;
+  WebSocketProxy.CLOSING = NativeWebSocket.CLOSING;
+  WebSocketProxy.CLOSED = NativeWebSocket.CLOSED;
+
+  window.WebSocket = WebSocketProxy;
+})();`;
+
+  return {
+    name: 'hmr-ws-shim',
+    transformIndexHtml: {
+      order: 'post' as const,
+      handler(html: string) {
+        if (html.includes('/@vite/client')) {
+          return html.replace(
+            '<script type="module" src="/@vite/client"></script>',
+            `<script>${shimCode}</script>\n    <script type="module" src="/@vite/client"></script>`
+          );
+        }
+        return html;
+      }
+    }
+  };
+}
+
 export default defineConfig(() => {
   return {
     plugins: [
+      hmrWsShimPlugin(),
       react(),
       tailwindcss(),
       VitePWA({

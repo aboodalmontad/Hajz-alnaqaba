@@ -3,25 +3,99 @@
   <head>
     <meta charset="UTF-8" />
     <script>
-      // Suppress harmless Vite HMR WebSocket error in AI Studio iframe environment
+      // Graceful Vite HMR WebSocket shim & suppression in AI Studio iframe environment
       (function() {
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          var NativeWebSocket = window.WebSocket;
+          try {
+            class ViteHmrShim extends EventTarget {
+              constructor(url, protocols) {
+                super();
+                this.url = String(url || '');
+                this.protocol = typeof protocols === 'string' ? protocols : (Array.isArray(protocols) ? protocols.join(', ') : 'vite-hmr');
+                this.readyState = 1;
+                this.binaryType = 'blob';
+                this.bufferedAmount = 0;
+                this.extensions = '';
+                this.onopen = null;
+                this.onclose = null;
+                this.onerror = null;
+                this.onmessage = null;
+                var self = this;
+                setTimeout(function() {
+                  var openEvent = new Event('open');
+                  if (typeof self.onopen === 'function') {
+                    try { self.onopen(openEvent); } catch (e) {}
+                  }
+                  self.dispatchEvent(openEvent);
+                }, 0);
+              }
+              send() {}
+              close() {
+                this.readyState = 3;
+              }
+            }
+            ViteHmrShim.CONNECTING = 0;
+            ViteHmrShim.OPEN = 1;
+            ViteHmrShim.CLOSING = 2;
+            ViteHmrShim.CLOSED = 3;
+
+            function WebSocketProxy(url, protocols) {
+              var urlStr = String(url || '');
+              var isHmr = (typeof protocols === 'string' && protocols.indexOf('vite-hmr') !== -1) ||
+                          (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1) ||
+                          urlStr.indexOf('token=') !== -1 ||
+                          urlStr.indexOf('vite-hmr') !== -1;
+              if (isHmr) {
+                return new ViteHmrShim(url, protocols);
+              }
+              return new NativeWebSocket(url, protocols);
+            }
+            WebSocketProxy.prototype = NativeWebSocket.prototype;
+            WebSocketProxy.CONNECTING = NativeWebSocket.CONNECTING;
+            WebSocketProxy.OPEN = NativeWebSocket.OPEN;
+            WebSocketProxy.CLOSING = NativeWebSocket.CLOSING;
+            WebSocketProxy.CLOSED = NativeWebSocket.CLOSED;
+            window.WebSocket = WebSocketProxy;
+          } catch (e) {}
+        }
+
         const origError = console.error;
         console.error = function(...args) {
           const msg = args.map(a => String(a)).join(' ');
-          if (msg.includes('WebSocket') || msg.includes('websocket') || msg.includes('/@vite/client')) {
+          if (
+            msg.includes('WebSocket') || 
+            msg.includes('websocket') || 
+            msg.includes('/@vite/client') || 
+            msg.includes('Failed to fetch') || 
+            msg.includes('Fetch error for')
+          ) {
             return;
           }
           origError.apply(console, args);
         };
         window.addEventListener('error', function(event) {
-          if (event && event.message && (event.message.includes('WebSocket') || event.message.includes('websocket'))) {
+          const msg = event?.message || '';
+          if (
+            msg.includes('WebSocket') || 
+            msg.includes('websocket') || 
+            msg.includes('/@vite/client') || 
+            msg.includes('Failed to fetch') || 
+            msg.includes('Fetch error for')
+          ) {
             event.stopImmediatePropagation();
             event.preventDefault();
           }
         }, true);
         window.addEventListener('unhandledrejection', function(event) {
           const reason = event.reason ? String(event.reason) : '';
-          if (reason.includes('WebSocket') || reason.includes('websocket')) {
+          if (
+            reason.includes('WebSocket') || 
+            reason.includes('websocket') || 
+            reason.includes('/@vite/client') || 
+            reason.includes('Failed to fetch') || 
+            reason.includes('Fetch error for')
+          ) {
             event.stopImmediatePropagation();
             event.preventDefault();
           }

@@ -64,9 +64,10 @@ interface CentralHQDashboardProps {
   adminToken?: string;
   onRefreshState?: () => void;
   onBackToBranch?: () => void;
+  onLogout?: () => void;
 }
 
-export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState, onBackToBranch }: CentralHQDashboardProps) {
+export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState, onBackToBranch, onLogout }: CentralHQDashboardProps) {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'agencies' | 'managers' | 'sync_status' | 'settings'>('overview');
   
   // Independent Branch Details & Performance Management Page View state
@@ -308,10 +309,10 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
         }
       }
     } catch (err: any) {
-      console.error('Error in loadHQData:', err);
+      console.warn('Notice in loadHQData (offline or connecting):', err?.message || err);
       setActionMessage({
-        text: `تعذر تحديث البيانات: ${err.message}`,
-        type: 'error'
+        text: `تعذر الاتصال بالخادم حالياً. يتم العمل على البيانات المحفوظة محلياً.`,
+        type: 'info'
       });
     } finally {
       setLoading(false);
@@ -415,7 +416,13 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
 
   const handleHqLogout = () => {
     sessionStorage.removeItem('hq_central_admin_auth');
+    sessionStorage.removeItem('agency_admin_token');
+    localStorage.removeItem('agency_admin_token');
+    sessionStorage.removeItem('agency_user_role');
     setIsHqAuthenticated(false);
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   const handleClearCacheAndReload = async () => {

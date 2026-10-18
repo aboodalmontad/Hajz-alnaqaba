@@ -20,6 +20,7 @@ export interface Ticket {
   staffId?: string;
   staffName?: string;
   notes?: string;
+  branchId?: string;
 }
 
 export interface Staff {
@@ -95,7 +96,7 @@ export interface AuditLog {
   action: string;
   details: string;
   user: string;
-  category?: 'ticket' | 'counter' | 'staff' | 'settings' | 'auth' | 'system';
+  category?: 'ticket' | 'counter' | 'staff' | 'settings' | 'auth' | 'system' | 'sync';
 }
 
 export interface AppState {

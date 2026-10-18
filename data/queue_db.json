@@ -71,18 +71,6 @@
       "jobTitle": "مندوب وكالات",
       "allowedCounterIds": [],
       "branchId": "branch-aleppo-main"
-    },
-    {
-      "id": "staff-1792159807462-jtls",
-      "branchId": "branch-azaz",
-      "name": "أحمد التاجر",
-      "pin": "556677",
-      "counterId": "",
-      "active": false,
-      "role": "staff",
-      "jobTitle": "مندوب وكالات",
-      "allowedCounterIds": [],
-      "createdAt": "2026-10-16T14:10:07.462Z"
     }
   ],
   "counters": [
@@ -183,6 +171,62 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792324516147-faut",
+      "timestamp": "2026-10-18T11:55:16.147Z",
+      "action": "مزامنة سحابية ناجحة",
+      "details": "تم رفع وتحديث بيانات الفرع إلى سحابة Supabase بنجاح تام",
+      "user": "المدير العام",
+      "category": "sync"
+    },
+    {
+      "id": "log-1792324496773-fe8m",
+      "timestamp": "2026-10-18T11:54:56.773Z",
+      "action": "مزامنة سحابية ناجحة",
+      "details": "تم رفع وتحديث بيانات الفرع إلى سحابة Supabase بنجاح تام",
+      "user": "المدير العام",
+      "category": "sync"
+    },
+    {
+      "id": "log-1792324478917-1h6p",
+      "timestamp": "2026-10-18T11:54:38.917Z",
+      "action": "حذف حساب موظف/مندوب",
+      "details": "تم حذف حساب مندوب وكالات أحمد التاجر من النظام نهائياً",
+      "user": "المدير العام",
+      "category": "staff"
+    },
+    {
+      "id": "log-1792324309704-gghn",
+      "timestamp": "2026-10-18T11:51:49.704Z",
+      "action": "تسجيل دخول مدير فرع",
+      "details": "تم تسجيل دخول مدير الفرع (أحمد حاج قدور) إلى فرع (المقر الرئيسي - القصر العدلي بحلب)",
+      "user": "أحمد حاج قدور",
+      "category": "auth"
+    },
+    {
+      "id": "log-1792323663771-02xo",
+      "timestamp": "2026-10-18T11:41:03.771Z",
+      "action": "تسجيل دخول المدير",
+      "details": "تم تسجيل الدخول بنجاح إلى لوحة الإدارة العامة",
+      "user": "المدير العام",
+      "category": "auth"
+    },
+    {
+      "id": "log-1792323607578-87df",
+      "timestamp": "2026-10-18T11:40:07.578Z",
+      "action": "مزامنة سحابية ناجحة",
+      "details": "تم رفع وتحديث بيانات الفرع إلى سحابة Supabase بنجاح تام",
+      "user": "المدير العام",
+      "category": "sync"
+    },
+    {
+      "id": "log-1792323582698-nuq8",
+      "timestamp": "2026-10-18T11:39:42.698Z",
+      "action": "تسجيل دخول مدير فرع",
+      "details": "تم تسجيل دخول مدير الفرع (أحمد حاج قدور) إلى فرع (المقر الرئيسي - القصر العدلي بحلب)",
+      "user": "أحمد حاج قدور",
+      "category": "auth"
+    },
     {
       "id": "log-1792249880282-tomt",
       "timestamp": "2026-10-17T15:11:20.282Z",
@@ -1219,7 +1263,8 @@
       "active": true,
       "createdAt": "2026-01-01T00:00:00.000Z",
       "lastLoginAt": "2026-10-16T09:20:45.448Z",
-      "updatedAt": "2026-10-16T22:29:24.054Z"
+      "updatedAt": "2026-10-16T22:29:24.054Z",
+      "activeToken": "branch-token-bm-alp-1792324309701-64624628947ec92a"
     },
     {
       "id": "bm-afr",
@@ -1294,7 +1339,16 @@
     "branch-token-bm-alp-1792249873548-43acd994fed5ebce",
     "branch-token-bm-afr-1792249880278-b604b8ddb2e5e41c",
     "admin-token-1792306728647",
-    "admin-token-1792357968799"
+    "admin-token-1792357968799",
+    "admin-token-1792322693451-d7265c137360fc829de486943075d7a1",
+    "branch-token-bm-alp-1792323582696-a86e7a44f0a1c102",
+    "admin-token-1792323663769-ab46bfc1affe9a98c56de6ff2d8463c6",
+    "admin-token-1792359685005",
+    "admin-token-1792359862534",
+    "admin-token-1792360202079",
+    "branch-token-bm-alp-1792324309701-64624628947ec92a",
+    "admin-token-1792360752116",
+    "admin-token-test"
   ],
   "branches": [
     {

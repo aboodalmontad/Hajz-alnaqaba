@@ -150,7 +150,24 @@ function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' {
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'kiosk' | 'display' | 'staff' | 'admin'>(getInitialTab);
   const [connected, setConnected] = useState(false);
-  const [userRole, setUserRole] = useState<'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate' | null>(null);
+  const [userRole, setUserRole] = useState<'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate' | null>(() => {
+    try {
+      const savedRole = sessionStorage.getItem('agency_user_role');
+      if (savedRole === 'hq_admin' || savedRole === 'branch_manager' || savedRole === 'counter_staff' || savedRole === 'agency_delegate') {
+        return savedRole;
+      }
+      const token = sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
+      if (token) {
+        if (token.startsWith('admin-token-') || token.startsWith('agency-admin-')) return 'hq_admin';
+        if (token.startsWith('branch-token-') || token.startsWith('bm-token-')) return 'branch_manager';
+      }
+      const branchId = sessionStorage.getItem('logged_branch_manager_id');
+      if (branchId) return 'branch_manager';
+    } catch {
+      return null;
+    }
+    return null;
+  });
   const [loggedManagerBranchId, setLoggedManagerBranchId] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem('logged_branch_manager_id') || null;
@@ -159,8 +176,25 @@ export default function App() {
     }
   });
 
+  // Safe navigation that updates the address bar URL
+  const handleNavigate = useCallback((tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => {
+    setCurrentTab(tab);
+    let targetPath = '/';
+    if (tab === 'staff') targetPath = '/agent';
+    else if (tab === 'kiosk') targetPath = '/kiosk';
+    else if (tab === 'display') targetPath = '/display';
+    else if (tab === 'admin') targetPath = '/admin';
+
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      window.history.pushState({ tab }, '', targetPath);
+    }
+  }, []);
+
   const handleLoginSuccess = (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string }) => {
     setUserRole(authData.role);
+    try {
+      sessionStorage.setItem('agency_user_role', authData.role);
+    } catch {}
     if (authData.role === 'hq_admin') {
       handleNavigate('admin');
       setCurrentTab('admin');
@@ -175,6 +209,20 @@ export default function App() {
       handleNavigate('staff');
     }
   };
+
+  const handleLogout = useCallback(() => {
+    setUserRole(null);
+    setLoggedManagerBranchId(null);
+    try {
+      sessionStorage.removeItem('agency_user_role');
+      sessionStorage.removeItem('agency_admin_token');
+      localStorage.removeItem('agency_admin_token');
+      sessionStorage.removeItem('logged_branch_manager_id');
+      sessionStorage.removeItem('hq_central_admin_auth');
+    } catch {}
+    handleNavigate('home');
+    setCurrentTab('home');
+  }, [handleNavigate]);
 
   const initialCache = loadPersistedClientState();
   const [tickets, setTickets] = useState<Ticket[]>(() => initialCache?.tickets || []);
@@ -212,19 +260,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Safe navigation that updates the address bar URL
-  const handleNavigate = useCallback((tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => {
-    setCurrentTab(tab);
-    let targetPath = '/';
-    if (tab === 'staff') targetPath = '/agent';
-    else if (tab === 'kiosk') targetPath = '/kiosk';
-    else if (tab === 'display') targetPath = '/display';
-    else if (tab === 'admin') targetPath = '/admin';
-
-    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
-      window.history.pushState({ tab }, '', targetPath);
-    }
-  }, []);
 
   const fetchState = useCallback(() => {
     return apiFetch('/api/state')
@@ -405,10 +440,17 @@ export default function App() {
 
   const waitingCount = tickets.filter(t => t.status === 'waiting').length;
 
+  // إظهار الهيدر الخاص بالمكاتب الفرعية (بوابة المندوب، إصدار الدور، الشاشة، لوحة المدير)
+  // فقط عند تسجيل دخول مدير المكتب الفرعي، وعدم إظهاره عند تسجيل دخول المدير العام أو قبل تسجيل الدخول
+  const showBranchNavbar = 
+    (userRole === 'branch_manager' || !!loggedManagerBranchId) && 
+    userRole !== 'hq_admin' && 
+    currentTab !== 'display';
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-['Cairo',sans-serif] flex flex-col">
-      {/* إخفاء الهيدر العلوي تماماً في صفحة شاشة عرض الدور للصالات */}
-      {currentTab !== 'display' && (
+      {/* الهيدر الخاص بالمكاتب الفرعية - يظهر حصراً عند تسجيل دخول مدير المكتب الفرعي */}
+      {showBranchNavbar && (
         <Navbar
           currentTab={currentTab}
           setCurrentTab={handleNavigate}
@@ -419,6 +461,8 @@ export default function App() {
           waitingCount={waitingCount}
           departmentTitle={settings.departmentTitle}
           onReconnect={fetchState}
+          userRole={userRole}
+          onLogout={handleLogout}
         />
       )}
 
@@ -428,13 +472,15 @@ export default function App() {
             <BranchDetailsView
               branchId={loggedManagerBranchId}
               adminToken={sessionStorage.getItem('agency_admin_token') || undefined}
-              onBackToBranches={() => setLoggedManagerBranchId(null)}
-              onLogout={() => {
+              onBackToBranches={() => {
                 setLoggedManagerBranchId(null);
-                sessionStorage.removeItem('agency_admin_token');
-                localStorage.removeItem('agency_admin_token');
-                sessionStorage.removeItem('logged_branch_manager_id');
+                setUserRole(null);
+                try {
+                  sessionStorage.removeItem('logged_branch_manager_id');
+                  sessionStorage.removeItem('agency_user_role');
+                } catch {}
               }}
+              onLogout={handleLogout}
             />
           ) : (
             <LoginHome
@@ -488,6 +534,7 @@ export default function App() {
           userRole === 'hq_admin' ? (
             <CentralHQDashboard
               adminToken={sessionStorage.getItem('agency_admin_token') || ''}
+              onLogout={handleLogout}
             />
           ) : (
             <AdminDashboard

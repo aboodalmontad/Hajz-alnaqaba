@@ -18,7 +18,8 @@ import {
   ExternalLink,
   X,
   RefreshCw,
-  RotateCcw
+  RotateCcw,
+  LogOut
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
@@ -34,6 +35,8 @@ interface NavbarProps {
   waitingCount: number;
   departmentTitle?: string;
   onReconnect?: () => void;
+  userRole?: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate' | null;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,7 +48,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   serverAppUrl,
   waitingCount,
   departmentTitle,
-  onReconnect
+  onReconnect,
+  userRole,
+  onLogout
 }) => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showServerStatusModal, setShowServerStatusModal] = useState(false);
@@ -181,7 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <ShieldAlert className="w-4 h-4" />
-                صلاحيات المدير الكاملة
+                لوحة المدير
               </button>
             </nav>
 
@@ -222,6 +227,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {baseUrl.replace(/^https?:\/\//, '')}
                 </span>
               </button>
+
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 hover:border-rose-500/40 transition-all cursor-pointer active:scale-95"
+                  title="تسجيل خروج مدير المكتب الفرعي"
+                >
+                  <LogOut className="w-4 h-4 text-rose-400" />
+                  <span className="hidden sm:inline">خروج</span>
+                </button>
+              )}
             </div>
 
           </div>
@@ -272,6 +288,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ShieldAlert className="w-4 h-4" />
               <span>لوحة المدير</span>
             </button>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="px-3 py-2 rounded-xl whitespace-nowrap flex items-center gap-1.5 font-bold touch-manipulation active:scale-95 transition-all bg-slate-800 text-rose-400 hover:bg-rose-950/40 border border-slate-700"
+                title="تسجيل خروج مدير الفرع"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>خروج</span>
+              </button>
+            )}
           </div>
 
         </div>

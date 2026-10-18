@@ -114,9 +114,9 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   const [skipNotes, setSkipNotes] = useState('');
   const [releaseWarningModal, setReleaseWarningModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  const showToast = (type: 'success' | 'error', text: string) => {
+  const showToast = (type: 'success' | 'error' | 'info', text: string) => {
     setToastMessage({ type, text });
     setTimeout(() => setToastMessage(null), 3500);
   };
@@ -502,7 +502,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
         {/* Toast */}
         {toastMessage && (
           <div className={`p-4 rounded-2xl shadow-lg text-xs font-bold flex items-center justify-between ${
-            toastMessage.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+            toastMessage.type === 'success' ? 'bg-emerald-600 text-white' : toastMessage.type === 'info' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'
           }`}>
             <span>{toastMessage.text}</span>
             <button onClick={() => setToastMessage(null)}><X className="w-4 h-4" /></button>
@@ -757,7 +757,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
       {/* Toast */}
       {toastMessage && (
         <div className={`p-4 rounded-2xl shadow-lg text-xs font-bold flex items-center justify-between ${
-          toastMessage.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+          toastMessage.type === 'success' ? 'bg-emerald-600 text-white' : toastMessage.type === 'info' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'
         }`}>
           <span>{toastMessage.text}</span>
           <button onClick={() => setToastMessage(null)}><X className="w-4 h-4" /></button>

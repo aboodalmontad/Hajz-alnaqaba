@@ -86,6 +86,7 @@ interface Ticket {
   staffId?: string;
   staffName?: string;
   notes?: string;
+  branchId?: string;
 }
 
 interface Staff {
@@ -150,7 +151,7 @@ interface AuditLog {
   action: string;
   details: string;
   user: string;
-  category?: 'ticket' | 'counter' | 'staff' | 'settings' | 'auth' | 'system';
+  category?: 'ticket' | 'counter' | 'staff' | 'settings' | 'auth' | 'system' | 'sync';
 }
 
 interface Branch {
