@@ -1124,9 +1124,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">صلاحيات المدير العام الكاملة</h1>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">إدارة فرعية</h1>
               <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-0.5 rounded-md border border-amber-500/40 font-semibold">
-                إدارة مركزية شاملة
+                صلاحيات مدير المكتب الفرعي
               </span>
             </div>
             <div className="text-xs text-slate-300 mt-1 flex items-center gap-3">

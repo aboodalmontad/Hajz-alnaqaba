@@ -19,7 +19,8 @@ import {
   X,
   RefreshCw,
   RotateCcw,
-  LogOut
+  LogOut,
+  Cloud
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
@@ -36,6 +37,7 @@ interface NavbarProps {
   departmentTitle?: string;
   onReconnect?: () => void;
   userRole?: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate' | null;
+  managerName?: string;
   onLogout?: () => void;
 }
 
@@ -50,6 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   departmentTitle,
   onReconnect,
   userRole,
+  managerName,
   onLogout
 }) => {
   const [showQrModal, setShowQrModal] = useState(false);
@@ -125,10 +128,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div>
                 <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 flex-wrap">
                   {departmentTitle || 'نقابة المحامين بحلب'}
-                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">دائرة الوكالات</span>
-                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 7</span>
+                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 7-2</span>
                 </div>
-                <div className="text-xs text-slate-400">نظام إدارة الدور والانتظار (محلي لحظي عبر Wi-Fi)</div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="text-amber-400 font-bold">{departmentTitle ? `مكتب: ${departmentTitle}` : ''}</span>
+                  {managerName && (
+                    <span className="text-amber-400 font-bold border-r border-slate-700 pr-2">
+                      مرحباً، {managerName}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -186,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <ShieldAlert className="w-4 h-4" />
-                لوحة المدير
+                إدارة فرعية
               </button>
             </nav>
 
@@ -212,6 +221,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden xl:inline text-[11px] font-bold">
                   {clearingCache ? 'جارِ المسح...' : 'تحديث ومسح الكاش'}
                 </span>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/sync/test', { method: 'POST' });
+                    const data = await res.json();
+                    alert(data.message);
+                  } catch (e) {
+                    alert('تعذر الوصول لخادم اختبار الاتصال بالسحابة');
+                  }
+                }}
+                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 px-3 py-2 rounded-xl text-xs font-bold border border-emerald-500/30 transition-all active:scale-95 cursor-pointer"
+                title="اختبار الاتصال بقاعدة البيانات السحابية"
+              >
+                <Cloud className="w-4 h-4" />
+                <span className="hidden xl:inline">اختبار السحابة</span>
               </button>
 
               <button

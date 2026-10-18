@@ -168,6 +168,7 @@ export default function App() {
     }
     return null;
   });
+  const [managerName, setManagerName] = useState<string>(() => sessionStorage.getItem('manager_name') || '');
   const [loggedManagerBranchId, setLoggedManagerBranchId] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem('logged_branch_manager_id') || null;
@@ -194,17 +195,23 @@ export default function App() {
     setUserRole(authData.role);
     try {
       sessionStorage.setItem('agency_user_role', authData.role);
+      if (authData.name) {
+        setManagerName(authData.name);
+        sessionStorage.setItem('manager_name', authData.name);
+      }
     } catch {}
     if (authData.role === 'hq_admin') {
       handleNavigate('admin');
       setCurrentTab('admin');
-    } else if (authData.role === 'branch_manager' && authData.branchId) {
-      setLoggedManagerBranchId(authData.branchId);
-      try {
-        sessionStorage.setItem('logged_branch_manager_id', authData.branchId);
-      } catch {}
-      handleNavigate('home');
-      setCurrentTab('home');
+    } else if (authData.role === 'branch_manager') {
+      if (authData.branchId) {
+        setLoggedManagerBranchId(authData.branchId);
+        try {
+            sessionStorage.setItem('logged_branch_manager_id', authData.branchId);
+        } catch {}
+      }
+      // Branch manager logs in to staff/counter operational portal
+      handleNavigate('staff');
     } else if (authData.role === 'counter_staff' || authData.role === 'agency_delegate') {
       handleNavigate('staff');
     }
@@ -212,9 +219,11 @@ export default function App() {
 
   const handleLogout = useCallback(() => {
     setUserRole(null);
+    setManagerName('');
     setLoggedManagerBranchId(null);
     try {
       sessionStorage.removeItem('agency_user_role');
+      sessionStorage.removeItem('manager_name');
       sessionStorage.removeItem('agency_admin_token');
       localStorage.removeItem('agency_admin_token');
       sessionStorage.removeItem('logged_branch_manager_id');
@@ -440,8 +449,7 @@ export default function App() {
 
   const waitingCount = tickets.filter(t => t.status === 'waiting').length;
 
-  // إظهار الهيدر الخاص بالمكاتب الفرعية (بوابة المندوب، إصدار الدور، الشاشة، لوحة المدير)
-  // فقط عند تسجيل دخول مدير المكتب الفرعي، وعدم إظهاره عند تسجيل دخول المدير العام أو قبل تسجيل الدخول
+  // إظهار الهيدر العلوي الخاص بالمكاتب الفرعية (بوابة المندوب، إصدار الدور، الشاشة، لوحة المدير) عند تسجيل دخول مدير الفرع
   const showBranchNavbar = 
     (userRole === 'branch_manager' || !!loggedManagerBranchId) && 
     userRole !== 'hq_admin' && 
@@ -462,6 +470,7 @@ export default function App() {
           departmentTitle={settings.departmentTitle}
           onReconnect={fetchState}
           userRole={userRole}
+          managerName={managerName}
           onLogout={handleLogout}
         />
       )}
