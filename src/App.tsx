@@ -13,6 +13,9 @@ import { Kiosk } from './components/Kiosk';
 import { MainDisplay } from './components/MainDisplay';
 import { StaffPortal } from './components/StaffPortal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { LoginHome } from './components/LoginHome';
+import { CentralHQDashboard } from './components/CentralHQDashboard';
+import { BranchDetailsView } from './components/BranchDetailsView';
 
 const defaultSettings: SystemSettings = {
   departmentTitle: 'دائرة الوكالات – نقابة المحامين بحلب',
@@ -147,6 +150,31 @@ function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' {
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'kiosk' | 'display' | 'staff' | 'admin'>(getInitialTab);
   const [connected, setConnected] = useState(false);
+  const [userRole, setUserRole] = useState<'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate' | null>(null);
+  const [loggedManagerBranchId, setLoggedManagerBranchId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem('logged_branch_manager_id') || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLoginSuccess = (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string }) => {
+    setUserRole(authData.role);
+    if (authData.role === 'hq_admin') {
+      handleNavigate('admin');
+      setCurrentTab('admin');
+    } else if (authData.role === 'branch_manager' && authData.branchId) {
+      setLoggedManagerBranchId(authData.branchId);
+      try {
+        sessionStorage.setItem('logged_branch_manager_id', authData.branchId);
+      } catch {}
+      handleNavigate('home');
+      setCurrentTab('home');
+    } else if (authData.role === 'counter_staff' || authData.role === 'agency_delegate') {
+      handleNavigate('staff');
+    }
+  };
 
   const initialCache = loadPersistedClientState();
   const [tickets, setTickets] = useState<Ticket[]>(() => initialCache?.tickets || []);
@@ -233,7 +261,7 @@ export default function App() {
       })
       .finally(() => {
         const token = sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
-        if (token) {
+        if (token && (token.startsWith('admin-token-') || token.startsWith('agency-admin-') || token.startsWith('branch-token-') || token.startsWith('bm-token-'))) {
           apiFetch('/api/admin/logs', {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -396,17 +424,26 @@ export default function App() {
 
       <main className="flex-1">
         {currentTab === 'home' && (
-          <NetworkGuide
-            localIPs={localIPs}
-            port={port}
-            serverAppUrl={serverAppUrl}
-            onNavigate={handleNavigate}
-            connected={connected}
-            onActivateServer={fetchState}
-            tickets={tickets}
-            counters={counters}
-            staffList={staffList}
-          />
+          loggedManagerBranchId ? (
+            <BranchDetailsView
+              branchId={loggedManagerBranchId}
+              adminToken={sessionStorage.getItem('agency_admin_token') || undefined}
+              onBackToBranches={() => setLoggedManagerBranchId(null)}
+              onLogout={() => {
+                setLoggedManagerBranchId(null);
+                sessionStorage.removeItem('agency_admin_token');
+                localStorage.removeItem('agency_admin_token');
+                sessionStorage.removeItem('logged_branch_manager_id');
+              }}
+            />
+          ) : (
+            <LoginHome
+              onLoginSuccess={handleLoginSuccess}
+              staffList={staffList}
+              counters={counters}
+              onNavigate={handleNavigate}
+            />
+          )
         )}
 
         {currentTab === 'kiosk' && (
@@ -448,21 +485,27 @@ export default function App() {
         )}
 
         {currentTab === 'admin' && (
-          <AdminDashboard
-            staffList={staffList}
-            counters={counters}
-            tickets={tickets}
-            counterSessions={counterSessions}
-            issuancePaused={issuancePaused}
-            date={date}
-            settings={settings}
-            auditLogs={auditLogs}
-            localIPs={localIPs}
-            port={port}
-            serverAppUrl={serverAppUrl}
-            onRefreshState={fetchState}
-            onNavigate={handleNavigate}
-          />
+          userRole === 'hq_admin' ? (
+            <CentralHQDashboard
+              adminToken={sessionStorage.getItem('agency_admin_token') || ''}
+            />
+          ) : (
+            <AdminDashboard
+              staffList={staffList}
+              counters={counters}
+              tickets={tickets}
+              counterSessions={counterSessions}
+              issuancePaused={issuancePaused}
+              date={date}
+              settings={settings}
+              auditLogs={auditLogs}
+              localIPs={localIPs}
+              port={port}
+              serverAppUrl={serverAppUrl}
+              onRefreshState={fetchState}
+              onNavigate={handleNavigate}
+            />
+          )
         )}
       </main>
     </div>

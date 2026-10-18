@@ -45,11 +45,13 @@ import {
   Tag,
   Sparkles,
   Ticket,
-  Save
+  Save,
+  Cloud
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Staff, Counter, Ticket as TicketType, AuditLog, SystemSettings, CounterSession, CategoryConfig } from '../types';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard, apiFetch } from '../utils/network';
+import { clearAppCache } from '../utils/cache';
 import { Kiosk } from './Kiosk';
 
 interface AdminDashboardProps {
@@ -186,6 +188,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Status message banner
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   // Sync settings when props change, ensuring categories are not emptied
   useEffect(() => {
@@ -297,6 +300,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setAuthError(err.message || 'رمز الدخول غير صحيح.');
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const [clearingCache, setClearingCache] = useState(false);
+
+  const handleClearCacheAndReload = async () => {
+    if (!window.confirm('هل تريد مسح جميع ملفات الذاكرة المؤقتة (الكاش) وإعادة تحميل أحدث نسخة نظيفة من الموقع؟')) {
+      return;
+    }
+    setClearingCache(true);
+    try {
+      await clearAppCache({ hardReload: true });
+    } catch {
+      window.location.reload();
     }
   };
 
@@ -588,6 +605,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
       }
     });
+  };
+
+  const handleSyncToCloud = async () => {
+    setSyncing(true);
+    try {
+      const data = await adminFetch('/api/branch/sync-to-cloud', { method: 'POST' });
+      showToast('success', data.message || 'تمت المزامنة بنجاح.');
+    } catch (err: any) {
+      showToast('error', err.message || 'فشل المزامنة.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // ----------------------------------------------------
@@ -1005,6 +1034,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {authLoading ? 'جارِ التحقق...' : 'تسجيل دخول المدير العام'}
             </button>
           </form>
+
+          {/* زر مسح الكاش وإعادة تحميل كامل الموقع نظيف */}
+          <div className="pt-4 border-t border-slate-100 text-center">
+            <button
+              type="button"
+              onClick={handleClearCacheAndReload}
+              disabled={clearingCache}
+              className="w-full py-3 px-4 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-amber-50 hover:to-amber-100 text-slate-700 hover:text-amber-900 font-bold rounded-xl shadow-sm border border-slate-300 hover:border-amber-400 transition-all text-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <RotateCcw className={`w-4 h-4 text-amber-600 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ تفريغ الكاش وإعادة التحميل...' : 'مسح الكاش وإعادة تحميل كامل الموقع نظيف'}</span>
+            </button>
+            <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+              يُفرغ ملفات الذاكرة المؤقتة (Service Worker & Cache) ومخزن المتصفح ويجلب أحدث نسخة نظيفة من السيرفر لحل أي تعارض بالملفات القديمة.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -1106,6 +1151,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <LogOut className="w-4 h-4" /> خروج
           </button>
         </div>
+      </div>
+
+      {/* Prominent Branch Cloud Sync Banner for Branch Managers & Admin */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950/70 to-slate-900 border border-blue-500/50 rounded-3xl p-6 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 shadow-inner">
+            <Cloud className="w-7 h-7 animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+              <span>مزامنة ورفع بيانات الفرع إلى السحابة المركزية</span>
+              <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-bold">
+                خاص بمدير الفرع والإدارة
+              </span>
+            </h2>
+            <p className="text-xs text-slate-300 mt-1">
+              قم برفع وتحديث جميع التذاكر، معاملات الوكالات، ومناوبات الموظفين إلى قاعدة بيانات Supabase السحابية بضغطة زر واحدة واضحة.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSyncToCloud}
+          disabled={syncing}
+          className="flex items-center gap-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600 disabled:opacity-50 text-white px-6 py-3.5 rounded-2xl text-xs font-black shadow-lg transition-all active:scale-95 cursor-pointer border border-blue-400/50 whitespace-nowrap"
+        >
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+          <span>{syncing ? 'جاري رفع ومزامنة البيانات...' : 'مزامنة ورفع بيانات الفرع إلى السحابة الآن'}</span>
+        </button>
       </div>
 
       {/* PROMINENT AGENT QR & LINK CARD FOR ADMIN */}
@@ -2061,6 +2135,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
               >
                 <FileSpreadsheet className="w-4 h-4" /> تصدير تقرير اليوم إلى Excel / CSV
+              </button>
+
+              <button
+                onClick={handleSyncToCloud}
+                disabled={syncing}
+                className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'جاري الرفع...' : 'مزامنة البيانات مع السحابة'}
               </button>
 
               <button

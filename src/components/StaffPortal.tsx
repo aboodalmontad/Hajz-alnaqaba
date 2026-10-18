@@ -28,6 +28,7 @@ import {
   Home
 } from 'lucide-react';
 import { Staff, Counter, Ticket, CategoryConfig } from '../types';
+import { clearAppCache } from '../utils/cache';
 
 interface StaffPortalProps {
   staffList: Staff[];
@@ -64,6 +65,19 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('remember_me') === 'true');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
+
+  const handleClearCacheAndReload = async () => {
+    if (!window.confirm('هل تريد مسح جميع ملفات الذاكرة المؤقتة (الكاش) وإعادة تحميل أحدث نسخة نظيفة من الموقع؟')) {
+      return;
+    }
+    setClearingCache(true);
+    try {
+      await clearAppCache({ hardReload: true });
+    } catch {
+      window.location.reload();
+    }
+  };
 
   // Sync search input with selected staff when a selection is made
   useEffect(() => {
@@ -284,7 +298,11 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
       await onCallNext(currentStaff.id, activeCounter.id);
       showToast('success', 'تم استدعاء المراجع وظهوره على الشاشة.');
     } catch (err: any) {
-      showToast('error', err.message || 'حدث خطأ أثناء استدعاء الدور.');
+      if (err.message && err.message.includes('لا توجد تذاكر')) {
+        showToast('info', 'لا توجد مراجعين في قائمة الانتظار حالياً لهذا الشباك.');
+      } else {
+        showToast('error', err.message || 'حدث خطأ أثناء استدعاء الدور.');
+      }
     } finally {
       setActionLoading(false);
     }
@@ -447,6 +465,22 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
               {loginLoading ? 'جارِ التحقق...' : 'تسجيل الدخول واختيار الشباك'}
             </button>
           </form>
+
+          {/* زر مسح الكاش وإعادة تحميل كامل الموقع نظيف */}
+          <div className="pt-3 border-t border-slate-100 text-center">
+            <button
+              type="button"
+              onClick={handleClearCacheAndReload}
+              disabled={clearingCache}
+              className="w-full py-2.5 px-3 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 font-bold rounded-xl shadow-sm border border-slate-200 hover:border-rose-300 transition-all text-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 text-rose-500 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ تفريغ الكاش وتحديث الموقع...' : 'مسح الكاش وإعادة تحميل كامل الموقع نظيف'}</span>
+            </button>
+            <p className="text-[10px] text-slate-400 mt-1.5">
+              يُفرغ الذاكرة المؤقتة (Service Worker & Cache) ومخزن المتصفح ويجلب أحدث نسخة نظيفة من السيرفر.
+            </p>
+          </div>
         </div>
       </div>
     );
