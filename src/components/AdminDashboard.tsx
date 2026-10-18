@@ -92,7 +92,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [authLoading, setAuthLoading] = useState(false);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs' | 'issuance_control'>('issuance_control');
+  const [activeTab, setActiveTab] = useState<'overview' | 'data_management' | 'settings' | 'logs'>('overview');
   const [dataSubTab, setDataSubTab] = useState<'tickets' | 'counters' | 'staff' | 'shifts' | 'categories' | 'database'>('counters');
 
   const getNextServicePrefix = (categories: CategoryConfig[] = []) => {
@@ -187,10 +187,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Status message banner
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Sync settings when props change
+  // Sync settings when props change, ensuring categories are not emptied
   useEffect(() => {
     if (settings) {
-      setFormSettings(settings);
+      setFormSettings(prev => ({
+        ...settings,
+        categories: (settings.categories && settings.categories.length > 0)
+          ? settings.categories
+          : (prev?.categories && prev.categories.length > 0 ? prev.categories : settings.categories)
+      }));
     }
   }, [settings]);
 
@@ -366,7 +371,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleExportCSV = async () => {
     try {
       const res = await fetch('/api/admin/export-csv', {
-        headers: { 'Authorization': `Bearer ${adminToken}` }
+        headers: { 'Authorization': `Bearer ${adminToken}`, 'Cache-Control': 'no-store' }
       });
       if (!res.ok) throw new Error('فشل تصدير التقرير');
       const blob = await res.blob();
@@ -385,8 +390,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Backup Download
-  const handleBackup = () => {
-    window.open(`/api/admin/backup?token=${adminToken}`, '_blank');
+  const handleBackup = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const token = adminToken || sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
+    if (!token) {
+      showToast('error', 'يرجى تسجيل الدخول أولاً بصفتك المدير العام.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/backup', {
+        headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-store' }
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول.');
+        }
+        throw new Error(`فشل تحميل النسخة الاحتياطية (الحالة: ${res.status})`);
+      }
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_data_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast('success', 'تم تنزيل النسخة الاحتياطية بنجاح.');
+    } catch (err: any) {
+      console.error('Backup error:', err);
+      showToast('error', err.message || 'حدث خطأ غير متوقع أثناء تحميل النسخة الاحتياطية.');
+    }
   };
 
   // Restore Database
@@ -625,9 +663,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleOpenRawDb = async () => {
     setRawDbLoading(true);
     try {
-      const res = await fetch(`/api/admin/backup?token=${adminToken}`);
-      if (!res.ok) throw new Error('فشل جلب بيانات قاعدة البيانات');
-      const json = await res.json();
+      const json = await apiFetch(`/api/admin/backup?token=${adminToken}`);
       setRawDbContent(JSON.stringify(json, null, 2));
       setShowRawDbModal(true);
     } catch (err: any) {
@@ -1047,64 +1083,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-0.5 rounded-md border border-amber-500/40 font-semibold">
                 إدارة مركزية شاملة
               </span>
-              <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">
-                الإصدار 7-1
-              </span>
             </div>
             <div className="text-xs text-slate-300 mt-1 flex items-center gap-3">
               <span>تاريخ التشغيل: <strong className="text-amber-400 font-mono">{date}</strong></span>
-              <span>·</span>
-              <span>حالة الإصدار: <strong className={issuancePaused ? 'text-red-400' : 'text-emerald-400'}>{issuancePaused ? 'متوقف مؤقتاً' : 'نشط وجاهز'}</strong></span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* زر لوحة التحكم الخاصة بإصدار الدور */}
-          <button
-            onClick={() => {
-              setActiveTab('issuance_control');
-              setTimeout(() => {
-                const el = document.getElementById('issuance-control-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }, 50);
-            }}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95 ${
-              activeTab === 'issuance_control'
-                ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 font-black'
-                : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white border border-amber-400/50 shadow-amber-900/20'
-            }`}
-          >
-            <Ticket className="w-4 h-4" />
-            <span>لوحة التحكم الخاصة بإصدار الدور</span>
-            <span className="bg-slate-900/60 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
-              {waitingTickets.length}
-            </span>
-          </button>
-
-          <button
-            onClick={handleToggleIssuance}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-sm ${
-              issuancePaused 
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-            }`}
-          >
-            {issuancePaused ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
-            {issuancePaused ? 'استئناف إصدار التذاكر' : 'إيقاف إصدار التذاكر مؤقتاً'}
-          </button>
-
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate('kiosk')}
-              className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all"
-              title="فتح جهاز إصدار الدور بملء الشاشة للمراجعين"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-              <span>جهاز الإصدار للمراجعين</span>
-            </button>
-          )}
-
           <button
             onClick={handleNewDay}
             className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
@@ -1173,23 +1159,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Main Navigation Tabs */}
       <div className="bg-white rounded-2xl p-2 shadow-sm border border-slate-200 flex gap-2 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('issuance_control')}
-          className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'issuance_control' 
-              ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/30' 
-              : 'text-slate-800 hover:bg-slate-100 bg-amber-50/70 border border-amber-200/70'
-          }`}
-        >
-          <Ticket className="w-4 h-4 text-amber-500" />
-          <span>لوحة التحكم الخاصة بإصدار الدور</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'issuance_control' ? 'bg-slate-900 text-white' : 'bg-amber-200 text-amber-900'
-          }`}>
-            {issuancePaused ? 'متوقف' : 'جاهز'}
-          </span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('data_management')}
           className={`px-5 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'data_management' 
@@ -1237,71 +1206,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           سجل التدقيق والرقابة الدائم
         </button>
       </div>
-
-      {/* SUBTAB: ISSUANCE CONTROL (KIOSK) */}
-      {activeTab === 'issuance_control' && (
-        <div id="issuance-control-section" className="space-y-4">
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                <Ticket className="w-5 h-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">لوحة التحكم الخاصة بإصدار تذاكر الدور</h3>
-                <p className="text-xs text-slate-500">
-                  لوحة تفاعلية متكاملة للمدير العام تتيح إصدار التذاكر فوراً ومتابعة مراجعي الدور وحالة النظام
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={handleToggleIssuance}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
-                  issuancePaused 
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                    : 'bg-slate-800 hover:bg-slate-700 text-white'
-                }`}
-              >
-                {issuancePaused ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
-                {issuancePaused ? 'استئناف إصدار التذاكر' : 'إيقاف إصدار التذاكر مؤقتاً'}
-              </button>
-              {onNavigate && (
-                <button
-                  onClick={() => onNavigate('kiosk')}
-                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  عرض شاشة جهاز الإصدار للمراجعين
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200">
-            <Kiosk
-              issuancePaused={issuancePaused}
-              waitingCount={tickets.filter(t => t.status === 'waiting').length}
-              categories={settings.categories}
-              departmentTitle={settings.departmentTitle}
-              counters={counters}
-              onRefreshState={onRefreshState}
-              onIssueTicket={async (category) => {
-                try {
-                  const data = await adminFetch('/api/tickets', {
-                    method: 'POST',
-                    body: JSON.stringify({ category })
-                  });
-                  onRefreshState();
-                  return data.ticket;
-                } catch (err) {
-                  console.error('Error issuing ticket', err);
-                  return null;
-                }
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* ======================================================== */}
       {/* SECTION 1: إدارة بيانات النظام (SYSTEM DATA MANAGEMENT) */}
@@ -1562,12 +1466,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-xs text-slate-500">إمكانية إضافة تذاكر يدوياً، تعديل الحالة، إعادة النداء، نقل الدور، أو الحذف والتصفير الشامل</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setActiveTab('issuance_control')}
-                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Ticket className="w-4 h-4 text-amber-400" /> لوحة التحكم الخاصة بإصدار الدور
-                  </button>
                   <button
                     onClick={() => {
                       setTicketFormCategory(settings?.categories?.[0]?.id || 'general');

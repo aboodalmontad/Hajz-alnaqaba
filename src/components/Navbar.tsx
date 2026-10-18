@@ -16,10 +16,13 @@ import {
   Copy,
   Check,
   ExternalLink,
-  X
+  X,
+  RefreshCw,
+  RotateCcw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
+import { clearAppCache } from '../utils/cache';
 
 interface NavbarProps {
   currentTab: string;
@@ -67,6 +70,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const [clearingCache, setClearingCache] = useState(false);
+  const [cacheMsg, setCacheMsg] = useState(false);
+
   const handleTriggerReconnect = () => {
     setReconnecting(true);
     if (onReconnect) {
@@ -77,6 +83,24 @@ export const Navbar: React.FC<NavbarProps> = ({
       setReconnectMsg(true);
       setTimeout(() => setReconnectMsg(false), 3000);
     }, 1000);
+  };
+
+  const handleClearCache = async (hardReload: boolean = false) => {
+    setClearingCache(true);
+    try {
+      await clearAppCache({ hardReload });
+      if (onReconnect) {
+        onReconnect();
+      }
+      setCacheMsg(true);
+      setTimeout(() => setCacheMsg(false), 3000);
+    } catch {
+      if (onReconnect) onReconnect();
+    } finally {
+      if (!hardReload) {
+        setClearingCache(false);
+      }
+    }
   };
 
   return (
@@ -97,7 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 flex-wrap">
                   {departmentTitle || 'نقابة المحامين بحلب'}
                   <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">دائرة الوكالات</span>
-                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 7-1</span>
+                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 6</span>
                 </div>
                 <div className="text-xs text-slate-400">نظام إدارة الدور والانتظار (محلي لحظي عبر Wi-Fi)</div>
               </div>
@@ -105,17 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Navigation Links */}
             <nav className="hidden xl:flex items-center gap-1 text-sm font-medium">
-              <button
-                onClick={() => setCurrentTab('home')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'home' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Wifi className="w-4 h-4" />
-                شبكة Wi-Fi و QR
-              </button>
+              {/* Removed Wifi/Grid button */}
               
               <button
                 onClick={() => setCurrentTab('kiosk')}
@@ -184,6 +198,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               <button
+                onClick={() => handleClearCache(false)}
+                disabled={clearingCache}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 rounded-xl border border-slate-700 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                title="تحديث ومسح الكاش فوراً"
+              >
+                <RefreshCw className={`w-4 h-4 ${clearingCache ? 'animate-spin' : ''}`} />
+                <span className="hidden xl:inline text-[11px] font-bold">
+                  {clearingCache ? 'جارِ المسح...' : 'تحديث ومسح الكاش'}
+                </span>
+              </button>
+
+              <button
                 onClick={() => setShowServerStatusModal(true)}
                 className="hidden sm:flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
                 title="اضغط لعرض تفاصيل اتصال السيرفر المحلي"
@@ -201,36 +227,50 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Mobile Bottom Navigation Bar */}
-          <div className="flex xl:hidden overflow-x-auto py-2 gap-1.5 border-t border-slate-800 text-xs scrollbar-none">
-            <button
-              onClick={() => setCurrentTab('home')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'home' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
-            >
-              <Wifi className="w-3.5 h-3.5" /> الشبكة
-            </button>
+          <div className="flex xl:hidden overflow-x-auto py-2.5 px-1 gap-2 border-t border-slate-800 text-xs sm:text-sm scrollbar-none">
             <button
               onClick={() => setCurrentTab('staff')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'staff' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'staff' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <Smartphone className="w-3.5 h-3.5 text-amber-400" /> المندوب (/agent)
+              <Smartphone className="w-4 h-4 text-amber-400" />
+              <span>بوابة المندوب</span>
             </button>
             <button
               onClick={() => setCurrentTab('kiosk')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'kiosk' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'kiosk' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <Ticket className="w-3.5 h-3.5" /> إصدار دور
+              <Ticket className="w-4 h-4" />
+              <span>إصدار دور</span>
             </button>
             <button
               onClick={() => setCurrentTab('display')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'display' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'display' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <Tv className="w-3.5 h-3.5" /> الشاشة
+              <Tv className="w-4 h-4" />
+              <span>الشاشة</span>
             </button>
             <button
               onClick={() => setCurrentTab('admin')}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 ${currentTab === 'admin' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-slate-300'}`}
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'admin' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
             >
-              <ShieldAlert className="w-3.5 h-3.5" /> المدير
+              <ShieldAlert className="w-4 h-4" />
+              <span>لوحة المدير</span>
             </button>
           </div>
 
@@ -366,7 +406,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {reconnectMsg && (
+            <button
+              onClick={() => handleClearCache(true)}
+              disabled={clearingCache}
+              className="w-full py-2.5 bg-slate-950 hover:bg-slate-800 text-amber-300 hover:text-white border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ مسح الكاش...' : 'تحديث ومسح الكاش (إعادة تحميل نظيفة)'}</span>
+            </button>
+
+            {cacheMsg && (
+              <div className="text-center text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl animate-pulse">
+                ✓ تم مسح ذاكرة الكاش وتحديث البيانات بنجاح!
+              </div>
+            )}
+
+            {reconnectMsg && !cacheMsg && (
               <div className="text-center text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-xl animate-pulse">
                 ✓ تم إرسال طلب الاتصال وتحديث البيانات بنجاح!
               </div>

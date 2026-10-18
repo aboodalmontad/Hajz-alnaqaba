@@ -42,40 +42,18 @@ export async function clearAppCache(options: { hardReload?: boolean } = {}): Pro
     console.warn('Failed to unregister service workers:', err);
   }
 
-  // 3. Clear temporary session and outdated bundle cache markers
+  // 3. Clear temporary session without deleting user app data
   try {
     if (typeof window !== 'undefined') {
+      // Clear sessionStorage for temporary views
       sessionStorage.clear();
-      
-      // Clean up workbox and cached asset keys from localStorage
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('workbox') || k.startsWith('vite') || k.includes('bundle') || k.includes('cache_version'))) {
-          keysToRemove.push(k);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      
       storageCleaned = true;
     }
   } catch (err) {
-    console.warn('Failed to clean storage:', err);
+    console.warn('Failed to clean session storage:', err);
   }
 
-  // 4. Clean IndexedDB caches (workbox-precache)
-  try {
-    if (typeof window !== 'undefined' && 'indexedDB' in window) {
-      const dbsToDrop = ['workbox-expiration-database', 'workbox-precaching'];
-      dbsToDrop.forEach(dbName => {
-        try { window.indexedDB.deleteDatabase(dbName); } catch {}
-      });
-    }
-  } catch (err) {
-    // Non-fatal
-  }
-
-  // 5. Force clean cache-busting ping to server
+  // 4. Force a clean cache-busting ping to server
   try {
     await fetch(`/api/ping?_cb=${Date.now()}`, {
       cache: 'reload',
@@ -97,18 +75,14 @@ export async function clearAppCache(options: { hardReload?: boolean } = {}): Pro
     timestamp: new Date().toLocaleTimeString('ar-SY')
   };
 
-  // 6. Hard reload if requested with cache-busting query parameter
+  // 5. Hard reload if requested
   if (options.hardReload && typeof window !== 'undefined') {
     setTimeout(() => {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('nocache', Date.now().toString());
-        url.searchParams.set('v', Math.random().toString(36).substring(2, 8));
-        window.location.replace(url.toString());
-      } catch {
-        window.location.reload();
-      }
-    }, 300);
+      // Add a cache-busting timestamp parameter and force hard navigation
+      const url = new URL(window.location.href);
+      url.searchParams.set('nocache', Date.now().toString());
+      window.location.replace(url.toString());
+    }, 400);
   }
 
   return result;

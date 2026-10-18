@@ -17,13 +17,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Enable CORS and handle preflight OPTIONS for all API requests
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-token, x-admin-pin');
+  if (req.path.startsWith('/api')) {
+    res.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.header('Pragma', 'no-cache');
+    res.header('Expires', '0');
+  }
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -48,26 +54,20 @@ try {
 }
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-let DATA_DIR = process.env.VERCEL ? join(os.tmpdir(), 'queue_data') : join(__dirname, 'data');
-let DB_FILE = join(DATA_DIR, 'queue_db.json');
+const PRIMARY_DATA_DIR = join(process.cwd(), 'data');
+const BACKUP_DATA_DIR = join(__dirname, 'data');
+const TMP_DATA_DIR = join(os.tmpdir(), 'queue_data');
 
-// Ensure data directory exists, with fallback to os.tmpdir() if read-only (e.g. Vercel serverless)
-try {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  fs.accessSync(DATA_DIR, fs.constants.W_OK);
-} catch (err) {
-  DATA_DIR = join(os.tmpdir(), 'queue_data');
-  DB_FILE = join(DATA_DIR, 'queue_db.json');
-  if (!fs.existsSync(DATA_DIR)) {
-    try {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    } catch (e) {
-      // Ignore
+[PRIMARY_DATA_DIR, BACKUP_DATA_DIR, TMP_DATA_DIR].forEach(dir => {
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
+  } catch (e) {
+    // Non-fatal
   }
-}
+});
+let DB_FILE = join(PRIMARY_DATA_DIR, 'queue_db.json');
 
 interface Ticket {
   id: string;
@@ -78,6 +78,7 @@ interface Ticket {
   status: 'waiting' | 'serving' | 'completed' | 'skipped' | 'cancelled';
   createdAt: string;
   calledAt?: string;
+  recallCount?: number;
   documentingStartedAt?: string;
   completedAt?: string;
   counterId?: string;
@@ -176,10 +177,26 @@ const defaultSettings: SystemSettings = {
   ticketSequence: 0,
   adminPin: '9999',
   categories: [
-    { id: 'general', prefix: 'A', name: 'توثيق وكالة', desc: 'تنظيم وتوثيق الوكالات العامة والخاصة وتثبيتها أصولاً' },
-    { id: 'special', prefix: 'B', name: 'الحصول على صورة عن وكالة', desc: 'سحب واستخراج صورة مصدقة طبق الأصل عن وكالة محفوظة' },
-    { id: 'attestation', prefix: 'C', name: 'تنظيم وكالة خاصة', desc: 'وكالات البيع، الفراغ، الإدارة، والتصرف العقاري والمركبات' },
-    { id: 'inquiry', prefix: 'D', name: 'تصديق العقود والاستعلامات', desc: 'تصديق وتثبيت العقود والاتفاقيات والاستعلام عن الرسوم النقابية' }
+    {
+      id: 'special',
+      prefix: 'A',
+      name: 'توثيق وكالة',
+      desc: 'تنجز هذه المعاملة أمام مندوب رئيس الفرع للتثبت من الهوية و محتويات الوكالة',
+      assignedCounterId: 'counter-1791640234085',
+      assignedCounterName: 'الشباك 1'
+    },
+    {
+      id: 'cat_1791641888137',
+      name: 'الحصول على صورة عن وكالة',
+      prefix: 'B',
+      desc: ''
+    },
+    {
+      id: 'cat_1791677992936',
+      name: 'عزل وكالة',
+      prefix: 'C',
+      desc: 'لعزل وكالة محامي يتطلب وجود صورة عن الوكالة أو رقمها ودفع رسم العزل وتبليغ المحامي المعزول والتأشير بوقوع العزل على الوكالة المعزولة .'
+    }
   ]
 };
 
@@ -190,99 +207,157 @@ const defaultDb: DatabaseSchema = {
   settings: defaultSettings,
   tickets: [],
   staff: [
-    { id: 'staff-1', name: 'أحمد المحمود', pin: '1234', counterId: '', active: true, role: 'staff', jobTitle: 'مندوب وكالات' },
-    { id: 'staff-2', name: 'فاطمة الخطيب', pin: '2345', counterId: '', active: true, role: 'staff', jobTitle: 'مندوب وكالات' },
-    { id: 'staff-3', name: 'محمد النجار', pin: '3456', counterId: '', active: true, role: 'staff', jobTitle: 'موظف توثيق' }
+    {
+      id: 'staff-1791572701221',
+      name: 'حسان مرشحة',
+      pin: '123456',
+      counterId: 'counter-1791640239853',
+      active: true,
+      role: 'staff',
+      jobTitle: 'مندوب وكالات',
+      allowedCounterIds: []
+    },
+    {
+      id: 'staff-1791572724537',
+      name: 'زكريا ننه',
+      pin: '123456',
+      counterId: '',
+      active: true,
+      role: 'staff',
+      jobTitle: 'مندوب وكالات',
+      allowedCounterIds: []
+    },
+    {
+      id: 'staff-1791657691085',
+      name: 'محمود ويس',
+      pin: '123456',
+      counterId: 'counter-1791640234085',
+      active: true,
+      role: 'staff',
+      jobTitle: 'مندوب وكالات',
+      allowedCounterIds: []
+    }
   ],
   counters: [
-    { id: 'counter-1', name: 'الشباك 1 (توثيق وكالة)', isOpen: true, isPaused: false },
-    { id: 'counter-2', name: 'الشباك 2 (الحصول على صورة عن وكالة)', isOpen: true, isPaused: false },
-    { id: 'counter-3', name: 'الشباك 3 (تنظيم وكالة خاصة)', isOpen: true, isPaused: false },
-    { id: 'counter-4', name: 'الشباك 4 (تصديق العقود والاستعلامات)', isOpen: true, isPaused: false }
+    {
+      id: 'counter-1791640234085',
+      name: 'الشباك 1',
+      isOpen: true,
+      isPaused: false
+    },
+    {
+      id: 'counter-1791640239853',
+      name: 'الشباك 2',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'special',
+      assignedServiceName: 'توثيق وكالة'
+    },
+    {
+      id: 'counter-1791640243217',
+      name: 'الشباك 3',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'special',
+      assignedServiceName: 'توثيق وكالة'
+    },
+    {
+      id: 'counter-1791640932058',
+      name: 'الشباك 5',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'cat_1791677992936',
+      assignedServiceName: 'عزل وكالة'
+    },
+    {
+      id: 'counter-1791642058000',
+      name: 'الشباك 6',
+      isOpen: true,
+      isPaused: false,
+      assignedServiceId: 'cat_1791641888137',
+      assignedServiceName: 'الحصول على صورة عن وكالة'
+    }
   ],
   counterSessions: [],
-  auditLogs: [
-    {
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      action: 'تهيئة النظام',
-      details: 'تم بدء تشغيل نظام إدارة الدور بنجاح',
-      user: 'النظام الآلي',
-      category: 'system'
-    }
-  ]
+  auditLogs: []
 };
 
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (err) {
-    console.error('Error creating data directory:', err);
-  }
-}
-
 function loadDb(): DatabaseSchema {
-  try {
-    ensureDataDir();
-    let data: string | null = null;
-    if (fs.existsSync(DB_FILE)) {
-      data = fs.readFileSync(DB_FILE, 'utf8');
-    } else {
-      const fallbackFile = join(os.tmpdir(), 'queue_db.json');
-      if (fs.existsSync(fallbackFile)) {
-        data = fs.readFileSync(fallbackFile, 'utf8');
+  const primaryDbPath = join(process.cwd(), 'data', 'queue_db.json');
+  
+  // 1. Primary database: Directly load the manager's active database file
+  if (fs.existsSync(primaryDbPath)) {
+    try {
+      const raw = fs.readFileSync(primaryDbPath, 'utf8');
+      const parsed = JSON.parse(raw) as DatabaseSchema;
+      if (parsed && typeof parsed === 'object' && parsed.settings) {
+        DB_FILE = primaryDbPath;
+        // Mirror to backup locations safely
+        saveDb(parsed);
+        return parsed;
       }
+    } catch (e) {
+      console.warn('Error reading primary queue_db.json, checking backup files:', e);
     }
-
-    if (data) {
-      const loaded = JSON.parse(data) as DatabaseSchema;
-      if (!loaded.settings) loaded.settings = { ...defaultSettings };
-      if (!loaded.settings.categories) loaded.settings.categories = defaultSettings.categories;
-      if (!loaded.settings.adminPin) loaded.settings.adminPin = '9999';
-      if (!loaded.settings.departmentTitle) loaded.settings.departmentTitle = defaultSettings.departmentTitle;
-      if (!loaded.settings.departmentSubtitle) loaded.settings.departmentSubtitle = defaultSettings.departmentSubtitle;
-      if (!loaded.settings.tickerMessage) loaded.settings.tickerMessage = defaultSettings.tickerMessage;
-      if (typeof loaded.settings.soundAlertsEnabled !== 'boolean') loaded.settings.soundAlertsEnabled = true;
-      if (!loaded.auditLogs) loaded.auditLogs = [];
-      if (!loaded.counterSessions) loaded.counterSessions = [];
-      if (!loaded.staff || !Array.isArray(loaded.staff) || loaded.staff.length === 0) {
-        loaded.staff = [...defaultDb.staff];
-      } else {
-        // Ensure jobTitle exists
-        loaded.staff.forEach(s => {
-          if (!s.jobTitle) s.jobTitle = 'مندوب وكالات';
-        });
-      }
-      // Clean up counters if missing fields
-      loaded.counters = loaded.counters.map(c => ({
-        ...c,
-        isPaused: typeof c.isPaused === 'boolean' ? c.isPaused : false
-      }));
-      if (!loaded.activeTokens || !Array.isArray(loaded.activeTokens)) {
-        loaded.activeTokens = [];
-      }
-      return loaded;
-    }
-  } catch (err) {
-    console.error('Error loading DB, using default:', err);
   }
+
+  // 2. Only if primary file is missing or corrupted, check backups in order
+  const backupPaths = [
+    join(process.cwd(), 'data', 'queue_db.backup.json'),
+    join(process.cwd(), 'data', 'queue_db.stable.json'),
+    join(__dirname, 'data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_db.json')
+  ];
+
+  for (const filePath of backupPaths) {
+    if (fs.existsSync(filePath)) {
+      try {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(raw) as DatabaseSchema;
+        if (parsed && typeof parsed === 'object' && parsed.settings) {
+          DB_FILE = filePath;
+          saveDb(parsed);
+          return parsed;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  // Fallback only if no files exist at all
+  console.log('No existing DB found, initializing fresh database.');
   saveDb(defaultDb);
   return defaultDb;
 }
 
 function saveDb(currentDb: DatabaseSchema) {
-  try {
-    ensureDataDir();
-    fs.writeFileSync(DB_FILE, JSON.stringify(currentDb, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error saving DB to primary location:', err);
+  const jsonContent = JSON.stringify(currentDb, null, 2);
+  const targets = [
+    join(process.cwd(), 'data', 'queue_db.json'),
+    join(process.cwd(), 'data', 'queue_db.backup.json'),
+    join(process.cwd(), 'data', 'queue_db.stable.json'),
+    join(__dirname, 'data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_data', 'queue_db.json'),
+    join(os.tmpdir(), 'queue_db.json')
+  ];
+
+  for (const target of targets) {
     try {
-      const fallbackFile = join(os.tmpdir(), 'queue_db.json');
-      fs.writeFileSync(fallbackFile, JSON.stringify(currentDb, null, 2), 'utf8');
-    } catch (fallbackErr) {
-      console.error('Error saving DB to fallback location:', fallbackErr);
+      const dir = dirname(target);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const tmpPath = `${target}.tmp.${Date.now()}`;
+      fs.writeFileSync(tmpPath, jsonContent, 'utf8');
+      fs.renameSync(tmpPath, target);
+    } catch {
+      try {
+        fs.writeFileSync(target, jsonContent, 'utf8');
+      } catch {
+        // Continue to other targets
+      }
     }
   }
 }
@@ -865,7 +940,7 @@ app.post('/api/staff/call-next', (req, res) => {
   res.json(nextTicket);
 });
 
-// Staff action: Recall ticket
+// Staff action: Recall ticket (Max 3 recalls allowed)
 app.post('/api/staff/recall', (req, res) => {
   const { ticketId, staffId } = req.body;
   const ticket = db.tickets.find(t => t.id === ticketId);
@@ -873,21 +948,39 @@ app.post('/api/staff/recall', (req, res) => {
     return res.status(400).json({ error: 'التذكرة غير موجودة أو ليست قيد الخدمة.' });
   }
 
+  const currentRecalls = ticket.recallCount || 0;
+  if (currentRecalls >= 3) {
+    return res.status(400).json({ 
+      error: 'تم استنفاد الحد الأقصى لإعادة النداء (3 مرات). يمكنك الآن تجاوز الدور لعدم حضور المراجع.' 
+    });
+  }
+
+  ticket.recallCount = currentRecalls + 1;
+  saveDb(db);
+  broadcastState();
+
   io.emit('ticket_called', {
     ticket,
     counter: ticket.counterName || 'الشباك',
     isRecall: true,
+    recallCount: ticket.recallCount,
     timestamp: new Date().toISOString()
   });
 
   logAudit(
     'إعادة النداء',
-    `إعادة النداء للتذكرة ${ticket.displayNumber} على ${ticket.counterName}`,
+    `إعادة النداء (المرة ${ticket.recallCount} من 3) للتذكرة ${ticket.displayNumber} على ${ticket.counterName}`,
     ticket.staffName || 'موظف',
     'ticket'
   );
 
-  res.json({ success: true, ticket });
+  res.json({ 
+    success: true, 
+    ticket,
+    recallCount: ticket.recallCount,
+    remainingRecalls: 3 - ticket.recallCount,
+    maxReached: ticket.recallCount >= 3
+  });
 });
 
 // Staff action: Complete service
@@ -919,11 +1012,12 @@ app.post('/api/staff/skip', (req, res) => {
   const { ticketId, notes } = req.body;
   const ticket = db.tickets.find(t => t.id === ticketId);
   if (!ticket || ticket.status !== 'serving') {
-    return res.status(400).json({ error: 'التذكرة غير موجودة.' });
+    return res.status(400).json({ error: 'التذكرة غير موجودة أو ليست قيد الخدمة.' });
   }
 
+  const recallInfo = ticket.recallCount ? ` (تمت إعادة النداء ${ticket.recallCount} مرات)` : '';
   ticket.status = 'skipped';
-  ticket.notes = notes || 'لم يحضر المراجع عند النداء';
+  ticket.notes = notes || `لم يحضر المراجع عند النداء${recallInfo}`;
 
   saveDb(db);
   broadcastState();
@@ -2087,6 +2181,17 @@ async function startServer() {
       res.sendFile(distIndex);
     } else {
       res.sendFile(join(__dirname, 'index.html'));
+    }
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n==================================================`);
+      console.error(` [خطأ] المنفذ ${PORT} قيد الاستخدام حالياً من قبل برنامج آخر!`);
+      console.error(` يرجى إغلاق أي نافذة خادم سابقة مفتوحة لنظام الدور، ثم حاول التشغيل مجدداً.`);
+      console.error(`==================================================\n`);
+    } else {
+      console.error('\n[خطأ في تشغيل الخادم]:', err);
     }
   });
 

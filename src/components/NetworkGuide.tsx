@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -20,9 +15,23 @@ import {
   CheckCircle2,
   Info,
   Monitor,
-  RefreshCw
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  Sparkles,
+  Layers,
+  Database,
+  Users,
+  Ticket as TicketIcon,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  Hourglass,
+  Activity
 } from 'lucide-react';
 import { resolveBaseUrl, resolveAgentUrl, copyToClipboard } from '../utils/network';
+import { clearAppCache, ClearCacheResult } from '../utils/cache';
+import { Ticket, Counter, Staff } from '../types';
 
 interface NetworkGuideProps {
   localIPs: string[];
@@ -31,6 +40,9 @@ interface NetworkGuideProps {
   onNavigate: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
   connected?: boolean;
   onActivateServer?: () => Promise<boolean> | void;
+  tickets?: Ticket[];
+  counters?: Counter[];
+  staffList?: Staff[];
 }
 
 export const NetworkGuide: React.FC<NetworkGuideProps> = ({
@@ -39,7 +51,10 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
   serverAppUrl,
   onNavigate,
   connected = false,
-  onActivateServer
+  onActivateServer,
+  tickets = [],
+  counters = [],
+  staffList = []
 }) => {
   const [overrideIP, setOverrideIP] = useState<string>('');
   const [copiedAgent, setCopiedAgent] = useState(false);
@@ -47,6 +62,24 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
   const [activeQrTarget, setActiveQrTarget] = useState<'agent' | 'display' | 'kiosk'>('agent');
   const [activating, setActivating] = useState(false);
   const [activateMsg, setActivateMsg] = useState<string | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [cacheResult, setCacheResult] = useState<ClearCacheResult | null>(null);
+  const [cacheMsg, setCacheMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const [wifiSsid, setWifiSsid] = useState(() => localStorage.getItem('agency_wifi_ssid') || '');
+  const [wifiPass, setWifiPass] = useState(() => localStorage.getItem('agency_wifi_pass') || '');
+  const [wifiSecurity, setWifiSecurity] = useState<'WPA' | 'WEP' | 'nopass'>(() => (localStorage.getItem('agency_wifi_sec') as any) || 'WPA');
+
+  const handleSaveWifi = (ssid: string, pass: string, sec: 'WPA' | 'WEP' | 'nopass') => {
+    setWifiSsid(ssid);
+    setWifiPass(pass);
+    setWifiSecurity(sec);
+    try {
+      localStorage.setItem('agency_wifi_ssid', ssid);
+      localStorage.setItem('agency_wifi_pass', pass);
+      localStorage.setItem('agency_wifi_sec', sec);
+    } catch {}
+  };
 
   // Auto-connect and activate server as soon as the Home page is entered
   useEffect(() => {
@@ -73,6 +106,42 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
     } finally {
       setActivating(false);
       setTimeout(() => setActivateMsg(null), 3500);
+    }
+  };
+
+  const handleClearCache = async (hardReload: boolean = false) => {
+    setClearingCache(true);
+    setCacheMsg(null);
+    try {
+      const res = await clearAppCache({ hardReload });
+      setCacheResult(res);
+      if (onActivateServer) {
+        await onActivateServer();
+      }
+      if (hardReload) {
+        setCacheMsg({
+          text: '✓ تم مسح ذاكرة الكاش بنجاح! جاري إعادة تحميل الصفحة بنسخة جديدة تماماً...',
+          type: 'success'
+        });
+      } else {
+        setCacheMsg({
+          text: `✓ تم مسح الكاش وتحديث بيانات النظام بنجاح (${res.timestamp})`,
+          type: 'success'
+        });
+        setTimeout(() => setCacheMsg(null), 5000);
+      }
+    } catch (err: any) {
+      console.error('Error clearing cache:', err);
+      setCacheMsg({
+        text: 'حدث خطأ أثناء مسح الكاش، جاري محاولة تحديث البيانات مباشرة.',
+        type: 'error'
+      });
+      if (onActivateServer) await onActivateServer();
+      setTimeout(() => setCacheMsg(null), 5000);
+    } finally {
+      if (!hardReload) {
+        setClearingCache(false);
+      }
     }
   };
 
@@ -116,6 +185,51 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
     window.location.hostname !== '127.0.0.1' && 
     window.location.hostname !== '::1';
 
+  // --- Real-Time Statistics Calculations for Home Page ---
+  // 1. عدد المندوبين العاملين على الشبابيك (Active staff at counters)
+  const activeWorkingStaffCount = counters.filter(c => c.isOpen && !c.isPaused && Boolean(c.currentStaffId || c.currentStaffName)).length;
+
+  // 2. إجمالي البطاقات المحجوزة (المسجلة في النظام اليوم)
+  const totalBookedTicketsCount = tickets.length;
+
+  // 3. عدد المعاملات المنجزة حتى اللحظة
+  const completedTicketsCount = tickets.filter(t => t.status === 'completed').length;
+
+  // معاملات قيد الخدمة وبانتظار النداء
+  const waitingTicketsCount = tickets.filter(t => t.status === 'waiting').length;
+  const servingTicketsCount = tickets.filter(t => t.status === 'serving').length;
+  const skippedTicketsCount = tickets.filter(t => t.status === 'skipped').length;
+
+  // 4. معدل الإنجاز (Completion Rate %)
+  const completionRate = totalBookedTicketsCount > 0 
+    ? Math.round((completedTicketsCount / totalBookedTicketsCount) * 100) 
+    : 0;
+
+  // 5. الوقت المتوسط التقريبي لإنجاز معاملة (Average Service Time)
+  const avgServiceTimeMinutes = (() => {
+    const servicedTickets = tickets.filter(t => {
+      if (t.status !== 'completed' || !t.completedAt) return false;
+      const start = t.documentingStartedAt || t.calledAt;
+      return Boolean(start);
+    });
+
+    if (servicedTickets.length === 0) {
+      // إذا لم تكتمل بعد أي معاملة بتوقيتات دقيقة، عرض تقدير افتراضي مبني على وتيرة العمل أو التقدير الطبيعي (مثلاً 4 دقائق)
+      return totalBookedTicketsCount > 0 && completedTicketsCount > 0 ? 4 : 0;
+    }
+
+    const totalDurationSeconds = servicedTickets.reduce((acc, t) => {
+      const start = new Date(t.documentingStartedAt || t.calledAt!).getTime();
+      const end = new Date(t.completedAt!).getTime();
+      const diffSec = Math.max(30, Math.round((end - start) / 1000));
+      // تصفية القيم الشاذة جداً (أكثر من ساعتين مثلاً)
+      return acc + (diffSec > 7200 ? 300 : diffSec);
+    }, 0);
+
+    const avgSeconds = Math.round(totalDurationSeconds / servicedTickets.length);
+    return Math.max(1, Math.round(avgSeconds / 60));
+  })();
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       
@@ -128,7 +242,7 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               <Wifi className="w-3.5 h-3.5" /> شبكة Wi-Fi المحلية (تعمل بدون اتصال إنترنت)
             </div>
             <div className="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-amber-400/40">
-              الإصدار 7-1
+              الإصدار 5
             </div>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
@@ -140,8 +254,8 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
           </p>
 
           {/* Real-time Server Connection Status & Activation Bar */}
-          <div className="bg-slate-950/80 border border-slate-700/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="bg-slate-950/80 border border-slate-700/80 rounded-2xl p-4 flex flex-col lg:flex-row items-center justify-between gap-3 shadow-inner">
+            <div className="flex items-center gap-3 w-full lg:w-auto">
               <div className={`w-3.5 h-3.5 rounded-full shrink-0 ${connected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-pulse' : activating ? 'bg-amber-400 animate-spin' : 'bg-rose-500'}`} />
               <div className="text-right">
                 <div className="text-xs font-bold flex items-center gap-1.5">
@@ -159,17 +273,39 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={handleManualActivate}
-              disabled={activating}
-              className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${activating ? 'animate-spin' : ''}`} />
-              {activating ? 'جارِ التنشيط...' : 'تنشيط وفحص الاتصال بالسيرفر'}
-            </button>
+            {/* Action Buttons Zone: Refresh & Clear Cache + Check Connection */}
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+              <button
+                onClick={() => handleClearCache(false)}
+                disabled={clearingCache || activating}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 cursor-pointer border border-amber-400/40"
+                title="مسح ذاكرة التخزين المؤقت (الكاش) وتحديث بيانات النظام فوراً"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${clearingCache ? 'animate-spin' : ''}`} />
+                <span>{clearingCache ? 'جارِ مسح الكاش والتحديث...' : 'تحديث ومسح الكاش'}</span>
+              </button>
+
+              <button
+                onClick={handleManualActivate}
+                disabled={activating || clearingCache}
+                className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-700 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                title="فحص الاتصال بالسيرفر المحلي"
+              >
+                <Wifi className={`w-3.5 h-3.5 ${activating ? 'animate-pulse text-amber-400' : 'text-emerald-400'}`} />
+                <span className="hidden sm:inline">{activating ? 'جارِ الفحص...' : 'فحص السيرفر'}</span>
+              </button>
+            </div>
           </div>
 
-          {activateMsg && (
+          {/* Cache & Action Feedback Alerts */}
+          {cacheMsg && (
+            <div className={`text-xs font-bold p-3 rounded-xl border flex items-center justify-center gap-2 animate-fade-in ${cacheMsg.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'}`}>
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{cacheMsg.text}</span>
+            </div>
+          )}
+
+          {activateMsg && !cacheMsg && (
             <div className={`text-xs font-bold p-2.5 rounded-xl text-center border animate-fade-in ${activateMsg.startsWith('✓') ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
               {activateMsg}
             </div>
@@ -178,23 +314,203 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
           <div className="flex flex-wrap gap-2.5 pt-2">
             <button
               onClick={() => onNavigate('staff')}
-              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 text-xs sm:text-sm"
+              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 text-xs sm:text-sm active:scale-95 cursor-pointer"
             >
               <Smartphone className="w-4 h-4" /> فتح واجهة المندوب على هذا الجهاز (/agent)
             </button>
             <button
               onClick={() => onNavigate('display')}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600"
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600 active:scale-95 cursor-pointer"
             >
               <Tv className="w-4 h-4" /> شاشة العرض
             </button>
             <button
               onClick={() => onNavigate('kiosk')}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600"
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl transition-all flex items-center gap-2 text-xs border border-slate-600 active:scale-95 cursor-pointer"
             >
               <Server className="w-4 h-4" /> إصدار التذاكر
             </button>
+
+            {/* Quick Hard Reload & Clean Cache Button */}
+            <button
+              onClick={() => handleClearCache(true)}
+              disabled={clearingCache}
+              className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-700 text-amber-300 hover:text-white font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs border border-amber-500/30 active:scale-95 cursor-pointer"
+              title="إعادة تحميل نظيفة مع مسح كامل لملفات الكاش في المتصفح"
+            >
+              <RotateCcw className={`w-4 h-4 text-amber-400 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>إعادة تحميل نظيفة (Hard Refresh)</span>
+            </button>
           </div>
+        </div>
+      </div>
+
+      {/* Offline Wi-Fi Connection Troubleshooting Banner */}
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-sm flex items-start gap-4 text-amber-950">
+        <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md">
+          <Wifi className="w-5 h-5" />
+        </div>
+        <div className="space-y-1.5 text-xs sm:text-sm">
+          <h3 className="font-black text-amber-900 text-sm sm:text-base">
+            ⚠️ تنبيه هام جداً عند الاتصال برواتـر محلي بدون إنترنت من الهواتف:
+          </h3>
+          <p className="leading-relaxed font-medium text-amber-900/90">
+            إذا كان الراوتر غير متصل بالإنترنت، قد تقوم بعض هواتف أندرويد أو آيفون بتبديل الاتصال تلقائياً إلى <strong>بيانات الجوال (4G/5G)</strong> أو رفض فتح صفحة محلية. لضمان عمل واجهة المندوب والشاشة فوراً:
+          </p>
+          <ul className="list-disc list-inside space-y-1 font-semibold text-amber-950 pr-2">
+            <li>قم بـ <strong>إيقاف بيانات الهاتف (Mobile Data)</strong> مؤقتاً في الهاتف قبل فتح الرابط.</li>
+            <li>عند ظهور رسالة الهاتف <em>«الشبكة لا توجد بها إنترنت، هل تريد البقاء متصلاً؟»</em> اختر <strong>«البقاء متصلاً»</strong> أو <strong>«Keep Connected»</strong> ولا تقم بقطع الاتصال.</li>
+            <li>تأكد من كتابة عنوان الـ IP المحلي الصحيح للكمبيوتر الخادم (مثلاً <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-900">http://192.168.1.50:3000</code>) أو مسح رمز QR مباشرة بكاميرا الهاتف.</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SECTION: REAL-TIME OPERATION STATISTICS (إحصائيات التشغيل والعمل اللحظية) */}
+      {/* ========================================================================= */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center">
+              <Activity className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                إحصائيات ومؤشرات التشغيل المباشرة
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                متابعة لحظية ومحدثة مباشرة لنشاط الشبابيك والمعاملات المنجزة والمحجوزة
+              </p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 self-start sm:self-auto bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-3 py-1 rounded-full text-xs font-bold shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span>تحديث مباشر متزامن</span>
+          </div>
+        </div>
+
+        {/* 5 Primary Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+          
+          {/* 1. عدد المندوبين العاملين على الشبابيك */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-blue-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                المندوبين العاملين على الشبابيك
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-blue-600 tracking-tight">
+                {activeWorkingStaffCount}
+                <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">مندوب</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                <span>إجمالي الشبابيك المتاحة:</span>
+                <strong className="text-slate-700 font-mono">{counters.filter(c => c.isOpen).length}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. عدد البطاقات المحجوزة */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-amber-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                البطاقات المحجوزة اليوم
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                <TicketIcon className="w-5 h-5 text-amber-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-amber-600 tracking-tight">
+                {totalBookedTicketsCount}
+                <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">بطاقة</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="text-amber-700 font-bold">{waitingTicketsCount} قيد الانتظار</span>
+                <span>·</span>
+                <span className="text-blue-700 font-bold">{servingTicketsCount} قيد الخدمة</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. معدل الإنجاز */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-indigo-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                معدل الإنجاز
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                <TrendingUp className="w-5 h-5 text-indigo-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <div className="text-3xl font-black font-mono text-indigo-600 tracking-tight flex items-baseline gap-1">
+                <span>{completionRate}%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, Math.max(0, completionRate))}%` }} 
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 4. الوقت المتوسط التقريبي لإنجاز معاملة */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-cyan-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl group-hover:bg-cyan-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                متوسط وقت إنجاز المعاملة
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
+                <Clock className="w-5 h-5 text-cyan-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-cyan-700 tracking-tight">
+                {avgServiceTimeMinutes > 0 ? avgServiceTimeMinutes : '—'}
+                {avgServiceTimeMinutes > 0 && <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">دقيقة</span>}
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                {avgServiceTimeMinutes > 0 ? 'تقريبي لكل معاملة' : 'قيد القياس مع إنجاز المعاملات'}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. عدد المعاملات المنجزة حتى اللحظة */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-md border-2 border-slate-100 hover:border-emerald-400/50 transition-all flex flex-col justify-between relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 leading-tight">
+                المعاملات المنجزة حتى اللحظة
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="text-3xl font-black font-mono text-emerald-600 tracking-tight">
+                {completedTicketsCount}
+                <span className="text-xs font-sans font-bold text-slate-400 mr-1.5">معاملة</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                {skippedTicketsCount > 0 ? (
+                  <span className="text-slate-600">{skippedTicketsCount} تجاوز لعدم الحضور</span>
+                ) : (
+                  <span className="text-emerald-700 font-medium">تم توثيقها بنجاح</span>
+                )}
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -401,7 +717,238 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
 
           </div>
         </div>
+      </div>
 
+      {/* DEDICATED CACHE & REFRESH CONTROL SECTION */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 relative overflow-hidden space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 text-amber-700 bg-amber-100 px-3 py-1 rounded-full text-xs font-bold">
+              <RotateCcw className="w-3.5 h-3.5" /> صيانة النظام وتحديث البيانات
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              تحديث ومسح ذاكرة التخزين المؤقت (Cache)
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              استخدم هذه الأداة لتنظيف ملفات المتصفح المؤقتة وإجبار التطبيق على تحميل أحدث نسخة من الخادم وتحديث حالة الأدوار والشبابيك فوراً
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${
+              connected ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              {connected ? 'الخادم نشط ومتزامن' : 'الخادم غير متصل'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Action 1: In-place Cache Clear & Data Refresh */}
+          <div className="bg-gradient-to-br from-amber-50/60 to-orange-50/40 rounded-2xl p-5 border border-amber-200/80 flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-sm">
+                  <RefreshCw className={`w-5 h-5 ${clearingCache ? 'animate-spin' : ''}`} />
+                </span>
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  لحظي دون إعادة تحميل
+                </span>
+              </div>
+              <h3 className="font-extrabold text-slate-900 text-base">
+                مسح الكاش وتحديث البيانات اللحظية
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                يمسح الذاكرة المؤقتة لطلبات الشبكة ويعيد جلب أحدث قائمة للتذاكر وحالات الموظفين والشبابيك فورياً دون مقاطعة استخدامك للصفحة.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleClearCache(false)}
+              disabled={clearingCache || activating}
+              className="w-full py-3 bg-amber-600 hover:bg-amber-500 active:scale-[0.98] text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ مسح الكاش والتحديث...' : 'مسح الكاش وتحديث البيانات الآن'}</span>
+            </button>
+          </div>
+
+          {/* Action 2: Full Hard Refresh & Clean Reload */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 border border-slate-700 flex flex-col justify-between space-y-4 shadow-md">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-bold shadow-sm">
+                  <RotateCcw className={`w-5 h-5 ${clearingCache ? 'animate-spin' : ''}`} />
+                </span>
+                <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-400/30">
+                  إعادة تحميل كاملة (Hard Reload)
+                </span>
+              </div>
+              <h3 className="font-extrabold text-white text-base">
+                تحديث شامل ومسح كامل للكاش
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                يمسح Cache Storage، يلغي برمجيات Service Workers القديمة، ثم يجبر المتصفح على تنزيل أحدث ملفات التطبيق من السيرفر كنسخة جديدة 100%.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleClearCache(true)}
+              disabled={clearingCache}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-[0.98] text-slate-950 font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <RotateCcw className={`w-4 h-4 ${clearingCache ? 'animate-spin' : ''}`} />
+              <span>{clearingCache ? 'جارِ المسح والتحميل...' : 'تحديث ومسح الكاش (إعادة تحميل نظيفة)'}</span>
+            </button>
+          </div>
+
+        </div>
+
+        {/* Clear Cache Details Info Banner */}
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>متى يُنصح باستخدام مسح الكاش؟</strong> عند تعديل أسماء الشبابيك أو فئات المعاملات، أو إذا لاحظ أحد مندوبي الوكالات عدم تحديث رقمه على الشاشة.
+            </span>
+          </div>
+          {cacheResult && (
+            <div className="shrink-0 bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-xl text-[11px] border border-emerald-200 flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              تم مسح {cacheResult.cachesCleared} مستودع كاش بنجاح ({cacheResult.timestamp})
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* WIFI QR CODE GENERATOR CARD FOR LOCAL OFFLINE ROUTERS */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-500/30 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700 pb-5">
+          <div>
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-semibold border border-amber-500/30">
+              <Wifi className="w-3.5 h-3.5" /> الاتصال الفوري بالشبكة المحلية بدون إنترنت
+            </div>
+            <h3 className="text-xl font-black tracking-tight mt-1">
+              باركود الاتصال السريع بشبكة الواي فاي (Wi-Fi QR Code)
+            </h3>
+            <p className="text-xs text-slate-300 mt-0.5">
+              أنشئ رمز QR لشبكة الواي فاي المحلية الخاصة بالفرع. عندما يمسحه المندوب بكاميرا هاتفه، سيتصل تلقائياً بالشبكة المحلية في ثانية واحدة دون الحاجة لإدخال كلمة المرور يدويًا!
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          <div className="md:col-span-5 flex flex-col items-center justify-center p-6 bg-slate-950/80 rounded-2xl border border-slate-700 space-y-4">
+            {wifiSsid ? (
+              <div className="p-4 bg-white rounded-2xl shadow-lg border border-slate-100">
+                <QRCodeSVG 
+                  value={`WIFI:S:${wifiSsid};T:${wifiSecurity};P:${wifiPass};;`}
+                  size={190}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+            ) : (
+              <div className="text-center p-8 text-slate-400 text-xs space-y-2">
+                <Wifi className="w-8 h-8 mx-auto text-amber-500 opacity-50" />
+                <p>أدخل اسم شبكة الواي فاي (SSID) أدناه لتوليد باركود الاتصال السريع</p>
+              </div>
+            )}
+            <div className="text-center">
+              <span className="text-xs font-bold text-amber-300">
+                {wifiSsid ? `شبكة: ${wifiSsid}` : 'الشبكة غير محددة بعد'}
+              </span>
+            </div>
+          </div>
+
+          <div className="md:col-span-7 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">اسم شبكة الواي فاي المحلية (SSID):</label>
+              <input 
+                type="text"
+                value={wifiSsid}
+                onChange={e => handleSaveWifi(e.target.value, wifiPass, wifiSecurity)}
+                placeholder="مثال: AleppoBar_LAN أو Agency_Wifi"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">كلمة مرور شبكة الواي فاي (Password):</label>
+              <input 
+                type="text"
+                value={wifiPass}
+                onChange={e => handleSaveWifi(wifiSsid, e.target.value, wifiSecurity)}
+                placeholder="كلمة المرور الخاصة بالراوتر المحلي"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500 focus:outline-none font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300">نوع الحماية (Security Type):</label>
+              <select
+                value={wifiSecurity}
+                onChange={e => handleSaveWifi(wifiSsid, wifiPass, e.target.value as any)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+              >
+                <option value="WPA">WPA / WPA2 / WPA3 (الأكثر شيوعاً)</option>
+                <option value="WEP">WEP (قديم)</option>
+                <option value="nopass">بدون كلمة مرور (شبكة مفتوحة)</option>
+              </select>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-[11px] text-amber-200 leading-relaxed">
+              💡 <strong>كيف يستعمل المندوب هذه الميزة؟</strong><br />
+              1. يفتح المندوب كاميرا هاتفه ويقوم بمسح <strong>باركود الواي فاي</strong> أعلاه فيتصل تلقائياً بالشبكة دون كتابة كلمة المرور.<br />
+              2. ثم يقوم بمسح <strong>باركود بوابة المندوب</strong> (أو فتح الرابط) لفتح النظام واستقبال المراجعين فوراً.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DUAL CONNECTIVITY CARD: Wi-Fi + 4G Mobile Data */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+            <Smartphone className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              تشغيل نظام الدور (Wi-Fi محلي) والبيانات الشخصية (4G) معاً في نفس الوقت
+            </h3>
+            <p className="text-xs text-slate-500">
+              كيف يعمل الهاتف على الشبكة المحلية للفرع وفي نفس الوقت يتلقى الرسائل والإشعارات عبر بيانات الجوال (4G/5G)؟
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs sm:text-sm text-slate-700">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-slate-900 flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold inline-flex items-center justify-center">1</span>
+              طريقة العمل التلقائية (في أندرويد وهواتف حديثة)
+            </h4>
+            <p className="text-slate-600 leading-relaxed text-xs">
+              أنظمة الهواتف الحديثة (مثل Android) تدعم بشكل افتراضي توجيه الطلبات الخاصة بالشبكات الداخلية (مثل <code className="font-mono bg-slate-200 px-1 rounded text-slate-800">192.168.x.x</code>) عبر الواي فاي المحلي، بينما تظل طلبات الإنترنت العام (واتساب، تيليجرام، المتصفحات الأخرى) تعمل عبر **بيانات الهاتف 4G** بسلاسة تامة دون تعارض.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-slate-900 flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold inline-flex items-center justify-center">2</span>
+              خطوات الإعداد على هاتف المندوب
+            </h4>
+            <ul className="list-disc list-inside space-y-1 text-xs text-slate-600">
+              <li>تأكد من تشغيل <strong>الواي فاي (Wi-Fi)</strong> والاتصال براوتر الفرع المحلي.</li>
+              <li>تأكد من إبقاء <strong>بيانات الجوال (Mobile Data / 4G)</strong> قيد التشغيل أيضاً في إعدادات الهاتف.</li>
+              <li>عند الاتصال بالواي فاي بدون إنترنت وظهر تنبيه <em>«الشبكة لا توجد بها إنترنت»</em>، اختر <strong>«البقاء متصلاً» (Keep Connected)</strong> أو <strong>«عدم التبديل تلقائياً»</strong>.</li>
+              <li>بهذه الطريقة يظل المندوب متصلاً بنظام الدور المحلي وفي نفس الوقت يتلقى رسائله الشخصية عبر الـ 4G.</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* Network Overview Cards */}
