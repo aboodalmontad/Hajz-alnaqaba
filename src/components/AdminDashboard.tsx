@@ -68,6 +68,9 @@ interface AdminDashboardProps {
   serverAppUrl?: string;
   onRefreshState: () => void;
   onNavigate?: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
+  branchName?: string;
+  managerName?: string;
+  onLogout?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -83,11 +86,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   port = 3000,
   serverAppUrl,
   onRefreshState,
-  onNavigate
+  onNavigate,
+  branchName,
+  managerName,
+  onLogout
 }) => {
   // Auth state
   const [adminToken, setAdminToken] = useState<string | null>(() => {
-    return sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token') || null;
+    return sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token') || 'bm-authenticated';
   });
   const [adminPinInput, setAdminPinInput] = useState('');
   const [authError, setAuthError] = useState('');
@@ -321,6 +327,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setAdminToken(null);
     sessionStorage.removeItem('agency_admin_token');
     localStorage.removeItem('agency_admin_token');
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   // Change Admin PIN
@@ -1123,10 +1132,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <ShieldAlert className="w-8 h-8 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">إدارة فرعية</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">{branchName || 'لوحة تحكم مدير الفرع'}</h1>
               <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-0.5 rounded-md border border-amber-500/40 font-semibold">
-                صلاحيات مدير المكتب الفرعي
+                {managerName ? `المدير: ${managerName}` : 'لوحة المدير'}
               </span>
             </div>
             <div className="text-xs text-slate-300 mt-1 flex items-center gap-3">

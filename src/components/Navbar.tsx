@@ -119,8 +119,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             
             {/* Brand Zone */}
             <div 
-              onClick={() => setCurrentTab('home')}
+              onClick={() => setCurrentTab('admin')}
               className="flex items-center gap-3 cursor-pointer select-none"
+              title="لوحة تحكم مدير الفرع - نقابة المحامين بحلب"
             >
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg border border-amber-400/40">
                 <Building2 className="w-7 h-7 text-slate-950" />
@@ -141,61 +142,63 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Navigation Links */}
-            <nav className="hidden xl:flex items-center gap-1 text-sm font-medium">
-              {/* Removed Wifi/Grid button */}
-              
+            {/* Navigation Links - Operational Branch Workspace & Manager Dashboard */}
+            <nav className="hidden xl:flex items-center gap-2 text-sm font-medium">
               <button
-                onClick={() => setCurrentTab('kiosk')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'kiosk' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
+                onClick={() => setCurrentTab('admin')}
+                className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 font-bold cursor-pointer ${
+                  currentTab === 'admin' 
+                    ? 'bg-amber-600 text-white shadow-md' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
+                title="لوحة تحكم مدير الفرع وإدارة العمليات"
+              >
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <span>لوحة المدير</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentTab('staff')}
+                className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 font-bold cursor-pointer ${
+                  currentTab === 'staff' 
+                    ? 'bg-amber-600 text-white shadow-md' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="بوابة المندوبين وخدمة الشبابيك"
+              >
+                <Smartphone className="w-4 h-4 text-amber-400" />
+                <span>بوابة المندوب (الشبابيك)</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentTab('kiosk')}
+                className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 font-bold cursor-pointer ${
+                  currentTab === 'kiosk' 
+                    ? 'bg-amber-600 text-white shadow-md' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title="جهاز إصدار التذاكر للمراجعين"
               >
                 <Ticket className="w-4 h-4" />
-                جهاز إصدار التذاكر
+                <span>إصدار الدور (التذاكر)</span>
               </button>
 
               <button
                 onClick={() => setCurrentTab('display')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 relative ${
+                className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 relative font-bold cursor-pointer ${
                   currentTab === 'display' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
+                    ? 'bg-amber-600 text-white shadow-md' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
+                title="شاشة العرض المركزية للصالات"
               >
                 <Tv className="w-4 h-4" />
-                شاشة العرض الرئيسية
+                <span>شاشة العرض</span>
                 {waitingCount > 0 && (
                   <span className="absolute -top-1 -left-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full animate-pulse">
                     {waitingCount}
                   </span>
                 )}
-              </button>
-
-              <button
-                onClick={() => setCurrentTab('staff')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'staff' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Smartphone className="w-4 h-4 text-amber-400" />
-                بوابة المندوب (الهاتف)
-              </button>
-
-              <button
-                onClick={() => setCurrentTab('admin')}
-                className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  currentTab === 'admin' 
-                    ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <ShieldAlert className="w-4 h-4" />
-                إدارة فرعية
               </button>
             </nav>
 
@@ -268,11 +271,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           </div>
 
-          {/* Mobile Bottom Navigation Bar */}
+          {/* Mobile Bottom Navigation Bar - Operational Branch Workspace & Manager Dashboard */}
           <div className="flex xl:hidden overflow-x-auto py-2.5 px-1 gap-2 border-t border-slate-800 text-xs sm:text-sm scrollbar-none">
             <button
+              onClick={() => setCurrentTab('admin')}
+              className={`px-4 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+                currentTab === 'admin' 
+                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <span>لوحة المدير</span>
+            </button>
+            <button
               onClick={() => setCurrentTab('staff')}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+              className={`px-4 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
                 currentTab === 'staff' 
                   ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
                   : 'bg-slate-800 text-slate-300 hover:text-white'
@@ -283,7 +297,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => setCurrentTab('kiosk')}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+              className={`px-4 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
                 currentTab === 'kiosk' 
                   ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
                   : 'bg-slate-800 text-slate-300 hover:text-white'
@@ -294,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => setCurrentTab('display')}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
+              className={`px-4 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
                 currentTab === 'display' 
                   ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
                   : 'bg-slate-800 text-slate-300 hover:text-white'
@@ -303,21 +317,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Tv className="w-4 h-4" />
               <span>الشاشة</span>
             </button>
-            <button
-              onClick={() => setCurrentTab('admin')}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap flex items-center gap-2 font-bold touch-manipulation active:scale-95 transition-all ${
-                currentTab === 'admin' 
-                  ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/50' 
-                  : 'bg-slate-800 text-slate-300 hover:text-white'
-              }`}
-            >
-              <ShieldAlert className="w-4 h-4" />
-              <span>لوحة المدير</span>
-            </button>
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="px-3 py-2 rounded-xl whitespace-nowrap flex items-center gap-1.5 font-bold touch-manipulation active:scale-95 transition-all bg-slate-800 text-rose-400 hover:bg-rose-950/40 border border-slate-700"
+                className="px-4 py-2 rounded-xl whitespace-nowrap flex items-center gap-1.5 font-bold touch-manipulation active:scale-95 transition-all bg-slate-800 text-rose-400 hover:bg-rose-950/40 border border-slate-700"
                 title="تسجيل خروج مدير الفرع"
               >
                 <LogOut className="w-4 h-4" />

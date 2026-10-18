@@ -24,7 +24,7 @@ import { apiFetch } from '../utils/network';
 import { clearAppCache } from '../utils/cache';
 
 interface LoginHomeProps {
-  onLoginSuccess: (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string }) => void;
+  onLoginSuccess: (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string; branchName?: string }) => void;
   staffList: Staff[];
   counters: Counter[];
   onNavigate?: (tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => void;
@@ -172,6 +172,10 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
               try {
                 sessionStorage.setItem('agency_admin_token', token);
                 localStorage.setItem('agency_admin_token', token);
+                sessionStorage.setItem('agency_user_role', 'hq_admin');
+                sessionStorage.setItem('hq_central_admin_auth', 'true');
+                sessionStorage.removeItem('logged_branch_manager_id');
+                sessionStorage.removeItem('logged_branch_name');
               } catch {}
               onLoginSuccess({
                 role: 'hq_admin',
@@ -190,6 +194,10 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
         try {
           sessionStorage.setItem('agency_admin_token', token);
           localStorage.setItem('agency_admin_token', token);
+          sessionStorage.setItem('agency_user_role', 'hq_admin');
+          sessionStorage.setItem('hq_central_admin_auth', 'true');
+          sessionStorage.removeItem('logged_branch_manager_id');
+          sessionStorage.removeItem('logged_branch_name');
         } catch {}
         onLoginSuccess({
           role: 'hq_admin',
@@ -239,12 +247,17 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
             try {
               sessionStorage.setItem('agency_admin_token', token);
               localStorage.setItem('agency_admin_token', token);
+              sessionStorage.setItem('agency_user_role', 'branch_manager');
+              sessionStorage.setItem('logged_branch_manager_id', res.manager.branchId);
+              sessionStorage.setItem('logged_branch_name', res.manager.branchName || '');
+              sessionStorage.removeItem('hq_central_admin_auth');
             } catch {}
             onLoginSuccess({
               role: 'branch_manager',
               token,
               name: `مدير الفرع: ${res.manager.fullName}`,
-              branchId: res.manager.branchId
+              branchId: res.manager.branchId,
+              branchName: res.manager.branchName
             });
             return;
           }
@@ -275,12 +288,17 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
           try {
             sessionStorage.setItem('agency_admin_token', token);
             localStorage.setItem('agency_admin_token', token);
+            sessionStorage.setItem('agency_user_role', 'branch_manager');
+            sessionStorage.setItem('logged_branch_manager_id', matchingManager.branchId);
+            sessionStorage.setItem('logged_branch_name', matchingManager.branchName || '');
+            sessionStorage.removeItem('hq_central_admin_auth');
           } catch {}
           onLoginSuccess({
             role: 'branch_manager',
             token,
             name: `مدير الفرع: ${matchingManager.fullName}`,
-            branchId: matchingManager.branchId
+            branchId: matchingManager.branchId,
+            branchName: matchingManager.branchName
           });
           return;
         }

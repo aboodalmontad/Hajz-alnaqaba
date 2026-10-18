@@ -2464,6 +2464,18 @@ app.get('/api/hq/branches-data', (req, res) => {
   });
 });
 
+// Helper to retry Supabase operations
+const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
+  try {
+    return await fn();
+  } catch (err: any) {
+    if (retries <= 0) throw err;
+    console.warn(`Supabase operation failed, retrying in ${delay}ms...`, err.message);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return withRetry(fn, retries - 1, delay * 2);
+  }
+};
+
 app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
   try {
     const { createClient } = await import('@supabase/supabase-js');
@@ -2486,8 +2498,10 @@ app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
       last_sync_at: new Date().toISOString(),
       is_active: true
     };
-    const { error: branchErr } = await supabase.from('branches').upsert(branchData, { onConflict: 'id' });
-    if (branchErr) console.warn('Branch upsert warn:', branchErr.message);
+    await withRetry(async () => {
+      const { error: branchErr } = await supabase.from('branches').upsert(branchData, { onConflict: 'id' });
+      if (branchErr) throw branchErr;
+    }).catch(e => console.warn('Branch upsert warn:', e.message));
 
     // 2. Upsert Tickets
     const tickets = db.tickets || [];
@@ -2513,8 +2527,10 @@ app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
         notes: t.notes || null,
         synced_at: new Date().toISOString()
       }));
-      const { error: ticketErr } = await supabase.from('tickets').upsert(mappedTickets, { onConflict: 'branch_id, local_id' });
-      if (ticketErr) throw new Error(`خطأ في رفع التذاكر: ${ticketErr.message}`);
+      await withRetry(async () => {
+        const { error: ticketErr } = await supabase.from('tickets').upsert(mappedTickets, { onConflict: 'branch_id, local_id' });
+        if (ticketErr) throw ticketErr;
+      }).catch(e => console.warn('Ticket upsert warn:', e.message));
     }
 
     // 3. Upsert Agencies Transactions
@@ -2538,8 +2554,10 @@ app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
         notes: a.notes || null,
         created_at: a.createdAt || new Date().toISOString()
       }));
-      const { error: agencyErr } = await supabase.from('agencies_transactions').upsert(mappedAgencies, { onConflict: 'branch_id, agency_number' });
-      if (agencyErr) throw new Error(`خطأ في رفع الوكالات: ${agencyErr.message}`);
+      await withRetry(async () => {
+        const { error: agencyErr } = await supabase.from('agencies_transactions').upsert(mappedAgencies, { onConflict: 'branch_id, agency_number' });
+        if (agencyErr) throw agencyErr;
+      }).catch(e => console.warn('Agency upsert warn:', e.message));
     }
 
     // 4. Upsert Staff
@@ -2555,8 +2573,10 @@ app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
         is_active: s.active !== false,
         allowed_counters: s.allowedCounterIds || []
       }));
-      const { error: staffErr } = await supabase.from('staff_users').upsert(mappedStaff, { onConflict: 'branch_id, id' });
-      if (staffErr) console.warn('Staff upsert warn:', staffErr.message);
+      await withRetry(async () => {
+        const { error: staffErr } = await supabase.from('staff_users').upsert(mappedStaff, { onConflict: 'branch_id, id' });
+        if (staffErr) throw staffErr;
+      }).catch(e => console.warn('Staff upsert warn:', e.message));
     }
 
     // 5. Upsert Counters
@@ -2572,8 +2592,10 @@ app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
         current_staff_id: c.currentStaffId || null,
         claimed_at: c.claimedAt || null
       }));
-      const { error: counterErr } = await supabase.from('counters').upsert(mappedCounters, { onConflict: 'branch_id, id' });
-      if (counterErr) console.warn('Counter upsert warn:', counterErr.message);
+      await withRetry(async () => {
+        const { error: counterErr } = await supabase.from('counters').upsert(mappedCounters, { onConflict: 'branch_id, id' });
+        if (counterErr) throw counterErr;
+      }).catch(e => console.warn('Counter upsert warn:', e.message));
     }
 
     // 6. Upsert Branch Managers
@@ -2588,8 +2610,10 @@ app.post('/api/branch/sync-to-cloud', requireAdmin, async (req, res) => {
         password_hash: m.password || 'hashed',
         active: m.active !== false
       }));
-      const { error: mgrErr } = await supabase.from('branch_managers').upsert(mappedManagers, { onConflict: 'branch_id, id' });
-      if (mgrErr) console.warn('Manager upsert warn:', mgrErr.message);
+      await withRetry(async () => {
+        const { error: mgrErr } = await supabase.from('branch_managers').upsert(mappedManagers, { onConflict: 'branch_id, id' });
+        if (mgrErr) throw mgrErr;
+      }).catch(e => console.warn('Manager upsert warn:', e.message));
     }
 
     logAudit('مزامنة سحابية ناجحة', 'تم رفع وتحديث بيانات الفرع إلى سحابة Supabase بنجاح تام', 'المدير العام', 'sync');

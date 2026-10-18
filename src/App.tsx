@@ -15,7 +15,6 @@ import { StaffPortal } from './components/StaffPortal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { LoginHome } from './components/LoginHome';
 import { CentralHQDashboard } from './components/CentralHQDashboard';
-import { BranchDetailsView } from './components/BranchDetailsView';
 
 const defaultSettings: SystemSettings = {
   departmentTitle: 'دائرة الوكالات – نقابة المحامين بحلب',
@@ -144,6 +143,15 @@ function getInitialTab(): 'home' | 'kiosk' | 'display' | 'staff' | 'admin' {
   if (path.startsWith('/admin') || search.get('tab') === 'admin' || hash === '#admin') {
     return 'admin';
   }
+
+  try {
+    const branchId = sessionStorage.getItem('logged_branch_manager_id');
+    const role = sessionStorage.getItem('agency_user_role');
+    if ((branchId || role === 'branch_manager') && (path === '/' || path === '')) {
+      return 'admin';
+    }
+  } catch {}
+
   return 'home';
 }
 
@@ -152,17 +160,18 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [userRole, setUserRole] = useState<'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate' | null>(() => {
     try {
+      const branchId = sessionStorage.getItem('logged_branch_manager_id');
+      if (branchId) return 'branch_manager';
+
       const savedRole = sessionStorage.getItem('agency_user_role');
       if (savedRole === 'hq_admin' || savedRole === 'branch_manager' || savedRole === 'counter_staff' || savedRole === 'agency_delegate') {
         return savedRole;
       }
-      const token = sessionStorage.getItem('agency_admin_token') || localStorage.getItem('agency_admin_token');
+      const token = sessionStorage.getItem('agency_admin_token');
       if (token) {
-        if (token.startsWith('admin-token-') || token.startsWith('agency-admin-')) return 'hq_admin';
         if (token.startsWith('branch-token-') || token.startsWith('bm-token-')) return 'branch_manager';
+        if (token.startsWith('admin-token-') || token.startsWith('agency-admin-')) return 'hq_admin';
       }
-      const branchId = sessionStorage.getItem('logged_branch_manager_id');
-      if (branchId) return 'branch_manager';
     } catch {
       return null;
     }
@@ -176,6 +185,7 @@ export default function App() {
       return null;
     }
   });
+  const [loggedManagerBranchName, setLoggedManagerBranchName] = useState<string>(() => sessionStorage.getItem('logged_branch_name') || '');
 
   // Safe navigation that updates the address bar URL
   const handleNavigate = useCallback((tab: 'home' | 'kiosk' | 'display' | 'staff' | 'admin') => {
@@ -191,7 +201,7 @@ export default function App() {
     }
   }, []);
 
-  const handleLoginSuccess = (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string }) => {
+  const handleLoginSuccess = (authData: { role: 'hq_admin' | 'branch_manager' | 'counter_staff' | 'agency_delegate'; token: string; name: string; branchId?: string; branchName?: string }) => {
     setUserRole(authData.role);
     try {
       sessionStorage.setItem('agency_user_role', authData.role);
@@ -201,19 +211,29 @@ export default function App() {
       }
     } catch {}
     if (authData.role === 'hq_admin') {
+      try {
+        sessionStorage.removeItem('logged_branch_manager_id');
+        sessionStorage.removeItem('logged_branch_name');
+        sessionStorage.setItem('hq_central_admin_auth', 'true');
+      } catch {}
       handleNavigate('admin');
       setCurrentTab('admin');
     } else if (authData.role === 'branch_manager') {
       if (authData.branchId) {
         setLoggedManagerBranchId(authData.branchId);
+        setLoggedManagerBranchName(authData.branchName || '');
         try {
-            sessionStorage.setItem('logged_branch_manager_id', authData.branchId);
+          sessionStorage.setItem('logged_branch_manager_id', authData.branchId);
+          sessionStorage.setItem('logged_branch_name', authData.branchName || '');
+          sessionStorage.removeItem('hq_central_admin_auth');
         } catch {}
       }
-      // Branch manager logs in to staff/counter operational portal
-      handleNavigate('staff');
+      // Branch manager logs in directly to their Manager Dashboard: لوحة تحكم مدير الفرع
+      handleNavigate('admin');
+      setCurrentTab('admin');
     } else if (authData.role === 'counter_staff' || authData.role === 'agency_delegate') {
       handleNavigate('staff');
+      setCurrentTab('staff');
     }
   };
 
@@ -221,12 +241,14 @@ export default function App() {
     setUserRole(null);
     setManagerName('');
     setLoggedManagerBranchId(null);
+    setLoggedManagerBranchName('');
     try {
       sessionStorage.removeItem('agency_user_role');
       sessionStorage.removeItem('manager_name');
       sessionStorage.removeItem('agency_admin_token');
       localStorage.removeItem('agency_admin_token');
       sessionStorage.removeItem('logged_branch_manager_id');
+      sessionStorage.removeItem('logged_branch_name');
       sessionStorage.removeItem('hq_central_admin_auth');
     } catch {}
     handleNavigate('home');
@@ -467,7 +489,7 @@ export default function App() {
           port={port}
           serverAppUrl={serverAppUrl}
           waitingCount={waitingCount}
-          departmentTitle={settings.departmentTitle}
+          departmentTitle={settings.departmentTitle || loggedManagerBranchName}
           onReconnect={fetchState}
           userRole={userRole}
           managerName={managerName}
@@ -477,18 +499,23 @@ export default function App() {
 
       <main className="flex-1">
         {currentTab === 'home' && (
-          loggedManagerBranchId ? (
-            <BranchDetailsView
-              branchId={loggedManagerBranchId}
-              adminToken={sessionStorage.getItem('agency_admin_token') || undefined}
-              onBackToBranches={() => {
-                setLoggedManagerBranchId(null);
-                setUserRole(null);
-                try {
-                  sessionStorage.removeItem('logged_branch_manager_id');
-                  sessionStorage.removeItem('agency_user_role');
-                } catch {}
-              }}
+          (userRole === 'branch_manager' || !!loggedManagerBranchId) ? (
+            <AdminDashboard
+              staffList={staffList}
+              counters={counters}
+              tickets={tickets}
+              counterSessions={counterSessions}
+              issuancePaused={issuancePaused}
+              date={date}
+              settings={settings}
+              auditLogs={auditLogs}
+              localIPs={localIPs}
+              port={port}
+              serverAppUrl={serverAppUrl}
+              onRefreshState={fetchState}
+              onNavigate={handleNavigate}
+              branchName={loggedManagerBranchName || settings.departmentTitle}
+              managerName={managerName}
               onLogout={handleLogout}
             />
           ) : (
@@ -507,7 +534,7 @@ export default function App() {
             onIssueTicket={handleIssueTicket}
             waitingCount={waitingCount}
             categories={settings.categories}
-            departmentTitle={settings.departmentTitle}
+            departmentTitle={loggedManagerBranchName || settings.departmentTitle}
             counters={counters}
             onRefreshState={fetchState}
           />
@@ -517,9 +544,12 @@ export default function App() {
           <MainDisplay
             tickets={tickets}
             counters={counters}
-            settings={settings}
+            settings={{
+              ...settings,
+              departmentTitle: loggedManagerBranchName || settings.departmentTitle
+            }}
             lastCalledTicket={lastCalledTicket}
-            onNavigateHome={() => handleNavigate('home')}
+            onNavigateHome={() => handleNavigate('staff')}
           />
         )}
 
@@ -534,8 +564,8 @@ export default function App() {
             onComplete={handleComplete}
             onSkip={handleSkip}
             onReturnQueue={handleReturnQueue}
-            onNavigateHome={() => handleNavigate('home')}
-            departmentTitle={settings.departmentTitle}
+            onNavigateHome={() => handleNavigate('staff')}
+            departmentTitle={loggedManagerBranchName || settings.departmentTitle}
           />
         )}
 
@@ -560,6 +590,9 @@ export default function App() {
               serverAppUrl={serverAppUrl}
               onRefreshState={fetchState}
               onNavigate={handleNavigate}
+              branchName={loggedManagerBranchName || settings.departmentTitle}
+              managerName={managerName}
+              onLogout={handleLogout}
             />
           )
         )}

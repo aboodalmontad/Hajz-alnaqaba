@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Cloud } from 'lucide-react';
 import {
   Building2,
   ArrowRight,
@@ -58,6 +59,7 @@ import {
   BranchComprehensiveDetails
 } from '../types';
 import { apiFetch } from '../utils/network';
+import { performDifferentialSync } from '../services/differentialSyncService';
 
 interface BranchDetailsViewProps {
   branchId: string;
@@ -65,6 +67,7 @@ interface BranchDetailsViewProps {
   onBackToBranches: () => void;
   onBranchUpdated?: () => void;
   onLogout?: () => void;
+  isBranchManagerPortal?: boolean;
 }
 
 export function BranchDetailsView({
@@ -72,7 +75,8 @@ export function BranchDetailsView({
   adminToken,
   onBackToBranches,
   onBranchUpdated,
-  onLogout
+  onLogout,
+  isBranchManagerPortal = false
 }: BranchDetailsViewProps) {
   // Navigation active tab inside branch details
   const [activeTab, setActiveTab] = useState<
@@ -741,6 +745,20 @@ export function BranchDetailsView({
 
   const { branch, manager, managerHistory, staff, counters, services, auditLogs, syncStatus } = details;
 
+  const handleFullSync = async () => {
+    setRefreshing(true);
+    setActionMessage({ text: 'جارِ إجراء مزامنة كاملة مع السحابة...', type: 'info' });
+    try {
+      const res = await performDifferentialSync();
+      setActionMessage({ text: `تمت المزامنة بنجاح: ${res.addedCount + res.updatedCount + res.deletedCount} تغيير تم معالجته.`, type: 'success' });
+      await loadBranchDetails(true);
+    } catch (e) {
+      setActionMessage({ text: 'فشل في المزامنة السحابية.', type: 'error' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20 text-slate-100" dir="rtl">
       {/* ================================================================= */}
@@ -750,20 +768,37 @@ export function BranchDetailsView({
         {/* Breadcrumb & Navigation */}
         <div className="flex items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800/80 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
-            <button
-              onClick={onBackToBranches}
-              className="text-slate-400 hover:text-amber-400 flex items-center gap-1.5 transition-colors font-bold cursor-pointer"
-            >
-              <ArrowRight className="w-4 h-4" />
-              <span>لوحة الإدارة المركزية</span>
-            </button>
+            {isBranchManagerPortal ? (
+              <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-amber-400" />
+                <span>لوحة إدارة المكتب الفرعي</span>
+              </span>
+            ) : (
+              <button
+                onClick={onBackToBranches}
+                className="text-slate-400 hover:text-amber-400 flex items-center gap-1.5 transition-colors font-bold cursor-pointer"
+              >
+                <ArrowRight className="w-4 h-4" />
+                <span>لوحة الإدارة المركزية</span>
+              </button>
+            )}
             <span className="text-slate-600">/</span>
-            <span className="text-slate-400">فروع نقابة المحامين</span>
+            <span className="text-slate-400">فرع نقابة المحامين</span>
             <span className="text-slate-600">/</span>
             <span className="text-amber-400 font-bold">{branch.name}</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleFullSync}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white transition-all cursor-pointer shadow-lg border border-amber-500/40"
+              title="مزامنة فورية كاملة مع السحابة"
+            >
+              <Cloud className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'جارِ المزامنة...' : 'مزامنة كاملة الآن'}</span>
+            </button>
+
             <button
               onClick={() => loadBranchDetails(true)}
               disabled={refreshing}
@@ -792,12 +827,14 @@ export function BranchDetailsView({
               <span>طباعة</span>
             </button>
 
-            <button
-              onClick={onBackToBranches}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
-            >
-              <span>قائمة الفروع</span>
-            </button>
+            {!isBranchManagerPortal && (
+              <button
+                onClick={onBackToBranches}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
+              >
+                <span>قائمة الفروع</span>
+              </button>
+            )}
 
             {onLogout && (
               <button
