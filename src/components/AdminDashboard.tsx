@@ -1047,6 +1047,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="bg-amber-500/20 text-amber-300 text-xs px-2.5 py-0.5 rounded-md border border-amber-500/40 font-semibold">
                 إدارة مركزية شاملة
               </span>
+              <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">
+                الإصدار 7-1
+              </span>
             </div>
             <div className="text-xs text-slate-300 mt-1 flex items-center gap-3">
               <span>تاريخ التشغيل: <strong className="text-amber-400 font-mono">{date}</strong></span>

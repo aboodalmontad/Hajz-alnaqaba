@@ -699,6 +699,9 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                   <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold">
                     سيرفر سحابي مستقل (Vercel + Supabase)
                   </span>
+                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">
+                    الإصدار 7-1
+                  </span>
                 </h1>
                 <p className="text-xs text-slate-400 mt-0.5">
                   منظومة الرقابة المركزية لكافة الفروع الجغرافية وتنزيل النسخ الاحتياطية الشاملة

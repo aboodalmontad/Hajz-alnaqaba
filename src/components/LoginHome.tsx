@@ -340,7 +340,7 @@ export const LoginHome: React.FC<LoginHomeProps> = ({ onLoginSuccess, staffList,
             <Building2 className="w-8 h-8" />
           </div>
           <span className="inline-block bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold mb-2">
-            نقابة المحامين – الجمهورية العربية السورية
+            نقابة المحامين – الجمهورية العربية السورية · الإصدار 7-1
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             تطبيق أرشفة الوكالات ونظام الدور

@@ -128,7 +128,7 @@ export const NetworkGuide: React.FC<NetworkGuideProps> = ({
               <Wifi className="w-3.5 h-3.5" /> شبكة Wi-Fi المحلية (تعمل بدون اتصال إنترنت)
             </div>
             <div className="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-amber-400/40">
-              الإصدار 5
+              الإصدار 7-1
             </div>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
