@@ -129,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div>
                 <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 flex-wrap">
                   {departmentTitle || 'نقابة المحامين بحلب'}
-                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 7-2</span>
+                  <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold">الإصدار 7-3</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span className="text-amber-400 font-bold">{departmentTitle ? `مكتب: ${departmentTitle}` : ''}</span>

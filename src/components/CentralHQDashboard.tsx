@@ -688,7 +688,7 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
             </div>
             <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
               <span className="inline-block bg-amber-600 text-white px-2.5 py-0.5 rounded-md text-[11px] font-bold shadow-sm">
-                الإصدار 7-2
+                الإصدار 7-3
               </span>
               <span className="inline-block bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-0.5 rounded-full text-[11px] font-bold">
                 سيرفر سحابي مستقل (Vercel + Supabase)
@@ -821,7 +821,7 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
                 <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5 flex-wrap">
                   لوحة الإدارة العامة المركزية
                   <span className="text-xs bg-amber-600 text-white px-2.5 py-0.5 rounded-md font-bold shadow-sm">
-                    الإصدار 7-2
+                    الإصدار 7-3
                   </span>
                   <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold">
                     سيرفر سحابي مستقل (Vercel + Supabase)
@@ -2132,7 +2132,7 @@ export function CentralHQDashboard({ currentBranchId, adminToken, onRefreshState
         </div>
         <div className="flex items-center gap-2">
           <span className="bg-amber-600 text-white font-bold px-2 py-0.5 rounded-md text-[11px] shadow-sm">
-            الإصدار 7-2
+            الإصدار 7-3
           </span>
           <span className="text-slate-500">منظومة أرشفة الوكالات وتنظيم الدور</span>
         </div>
